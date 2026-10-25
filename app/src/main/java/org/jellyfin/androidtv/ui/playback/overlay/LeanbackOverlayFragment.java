@@ -4,6 +4,7 @@ import static org.koin.java.KoinJavaComponent.inject;
 
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -89,6 +90,16 @@ public class LeanbackOverlayFragment extends PlaybackSupportFragment {
 
     public void hideOverlay() {
         hideControlsOverlay(true);
+    }
+
+    public void revealPlaybackControls() {
+        showControlsOverlay(true);
+        // The first primary action is Play/Pause, even when another action was focused before hiding.
+        View root = getView();
+        if (root == null) return;
+        View dock = root.findViewById(androidx.leanback.R.id.controls_dock);
+        ViewGroup bar = dock == null ? null : dock.findViewById(androidx.leanback.R.id.control_bar);
+        if (bar != null && bar.getChildCount() > 0) bar.getChildAt(0).requestFocus();
     }
 
     public void setFading(boolean fadingEnabled) {

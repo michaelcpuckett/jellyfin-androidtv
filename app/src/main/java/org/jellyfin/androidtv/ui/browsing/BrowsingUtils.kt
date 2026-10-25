@@ -217,6 +217,9 @@ object BrowsingUtils {
 	)
 
 	@JvmStatic
+	fun createPosterGridArtistsRequest(parentId: UUID) = createArtistsRequest(parentId).copy(fields = ItemRepository.browseFields)
+
+	@JvmStatic
 	fun createPersonItemsRequest(personId: UUID, itemType: BaseItemKind) = GetItemsRequest(
 		fields = ItemRepository.itemFields,
 		personIds = setOf(personId),
@@ -336,4 +339,7 @@ object BrowsingUtils {
 
 		return baseRequest
 	}
+
+	@JvmStatic
+	fun createPosterGridItemsRequest(parent: BaseItemDto) = createBrowseGridItemsRequest(parent).copy(fields = ItemRepository.browseFields)
 }

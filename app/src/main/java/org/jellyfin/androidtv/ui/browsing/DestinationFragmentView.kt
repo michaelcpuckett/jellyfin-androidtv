@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.AttributeSet
+import android.view.KeyEvent
+import android.view.View
 import android.widget.FrameLayout
 import androidx.core.os.BundleCompat
 import androidx.core.os.ParcelCompat
@@ -13,8 +15,14 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentTransaction
+import androidx.leanback.widget.BaseGridView
+import androidx.leanback.widget.ViewHolderTask
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.ui.navigation.Destination
 import org.jellyfin.androidtv.ui.navigation.NavigationAction
+import org.jellyfin.androidtv.ui.navigation.isSidebarGridBoundary
+import org.jellyfin.androidtv.ui.navigation.isHorizontalSidebarGrid
+import org.jellyfin.androidtv.ui.navigation.previousGridPosition
 import org.jellyfin.androidtv.util.createBundle
 import timber.log.Timber
 import java.util.Stack
@@ -51,6 +59,59 @@ class DestinationFragmentView @JvmOverloads constructor(
 	context: Context,
 	attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs) {
+	var currentDestination: Destination.Fragment? = null
+		private set
+	var onDestinationChanged: ((Destination.Fragment) -> Unit)? = null
+	var onFocusSidebar: (() -> Boolean)? = null
+	private var lastContentFocus: View? = null
+
+	fun focusSidebar(): Boolean {
+		lastContentFocus = findFocus()
+		return onFocusSidebar?.invoke() ?: false
+	}
+
+	fun focusContent(): Boolean {
+		val previous = lastContentFocus
+		if (previous?.isAttachedToWindow == true && previous.isShown && previous.requestFocus()) return true
+		return fragmentManager.findFragmentByTag(FRAGMENT_TAG_CONTENT)?.view?.requestFocus() ?: false
+	}
+
+	override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+		val startKey = if (layoutDirection == View.LAYOUT_DIRECTION_RTL) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+		if (onFocusSidebar != null && event.action == KeyEvent.ACTION_DOWN && event.keyCode == startKey) {
+			val focused = findFocus()
+			val grid = focused?.let { generateSequence(it) { view -> view.parent as? View }.filterIsInstance<BaseGridView>().firstOrNull() }
+			if (grid != null) {
+				val card = grid.findContainingItemView(focused)
+				if (card != null) {
+					val position = grid.getChildAdapterPosition(card)
+					val children = (0 until grid.childCount).map { grid.getChildAt(it) }
+					val horizontal = isHorizontalSidebarGrid(grid.javaClass)
+					val atBoundary = isSidebarGridBoundary(
+						selectedPosition = position,
+						selectedX = card.left,
+						firstItemX = grid.findViewHolderForAdapterPosition(0)?.itemView?.left,
+						attachedItemXs = children.map { it.left },
+						horizontal = horizontal,
+						rtl = layoutDirection == View.LAYOUT_DIRECTION_RTL,
+					)
+					if (atBoundary && focusSidebar()) return true
+					val previous = previousGridPosition(position, horizontal, children.map { it.top }.distinct().size, atBoundary)
+					if (previous != null && previous < (grid.adapter?.itemCount ?: 0)) {
+						// Request the actual previous adapter item, including one scrolled off screen.
+						// This bypasses Compose's unreliable spatial search between native poster views.
+						if (grid.findViewHolderForAdapterPosition(previous)?.itemView?.requestFocus() == true) return true
+						grid.setSelectedPositionSmooth(previous, ViewHolderTask { holder ->
+							if (grid.hasFocus()) holder.itemView.requestFocus()
+						})
+						return true
+					}
+				}
+			}
+		}
+		return super.dispatchKeyEvent(event)
+	}
+
 	private companion object {
 		private const val FRAGMENT_TAG_CONTENT = "content"
 		private const val BUNDLE_SUPER = "super"
@@ -129,6 +190,9 @@ class DestinationFragmentView @JvmOverloads constructor(
 		entry: HistoryEntry,
 		transaction: FragmentTransaction,
 	) {
+		lastContentFocus = null
+		currentDestination = Destination.Fragment(entry.name.kotlin, entry.arguments)
+		onDestinationChanged?.invoke(currentDestination!!)
 		var fragment = entry.fragment
 
 		// Create if there is no existing fragment
@@ -195,3 +259,8 @@ class DestinationFragmentView @JvmOverloads constructor(
 		}
 	}
 }
+
+/** Bridge the nested home rows' native focus boundary to the shared Compose sidebar. */
+internal fun View.focusNavigationSidebar(): Boolean = generateSequence(this) { it.parent as? View }
+	.filterIsInstance<DestinationFragmentView>()
+	.firstOrNull()?.focusSidebar() ?: false

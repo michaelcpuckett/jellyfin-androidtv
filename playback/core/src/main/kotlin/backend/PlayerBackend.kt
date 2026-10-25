@@ -2,6 +2,7 @@ package org.jellyfin.playback.core.backend
 
 import org.jellyfin.playback.core.mediastream.MediaStream
 import org.jellyfin.playback.core.model.PositionInfo
+import org.jellyfin.playback.core.model.VideoFrameStats
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.support.PlaySupportReport
 import org.jellyfin.playback.core.timedevent.TimedEvent
@@ -25,6 +26,7 @@ interface PlayerBackend {
 
 	fun setListener(eventListener: PlayerBackendEventListener?)
 	fun getPositionInfo(): PositionInfo
+	fun getVideoFrameStats(): VideoFrameStats? = null
 
 	// Mutation
 

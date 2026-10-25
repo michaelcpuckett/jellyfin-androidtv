@@ -34,6 +34,7 @@ import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.HttpDataSource;
 import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.DecoderCounters;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
@@ -47,6 +48,9 @@ import androidx.media3.ui.CaptionStyleCompat;
 import androidx.media3.ui.PlayerView;
 
 import org.jellyfin.androidtv.R;
+import org.jellyfin.androidtv.BuildConfig;
+import org.jellyfin.playback.core.model.VideoFrameStats;
+import org.jellyfin.playback.media3.exoplayer.VideoFrameCounter;
 import org.jellyfin.androidtv.data.compat.StreamInfo;
 import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.constant.BufferLength;
@@ -81,6 +85,8 @@ public class VideoManager {
     private PlaybackControllerNotifiable mPlaybackControllerNotifiable;
     private PlaybackOverlayFragmentHelper _helper;
     public ExoPlayer mExoPlayer;
+    private final VideoFrameCounter videoFrameCounter = new VideoFrameCounter();
+    private Object videoStatsTag;
     private PlayerView mExoPlayerView;
     private Handler mHandler = new Handler();
 
@@ -103,9 +109,21 @@ public class VideoManager {
 
         mExoPlayer = configureExoplayerBuilder(activity, assHandler).build();
 
-        if (userPreferences.get(UserPreferences.Companion.getDebuggingEnabled())) {
+        if (BuildConfig.DEBUG && userPreferences.get(UserPreferences.Companion.getDebuggingEnabled())) {
             mExoPlayer.addAnalyticsListener(new EventLogger());
         }
+
+        mExoPlayer.addAnalyticsListener(new AnalyticsListener() {
+            @Override
+            public void onVideoDisabled(EventTime eventTime, DecoderCounters counters) {
+                if (eventTime.timeline.isEmpty()) return;
+                MediaItem eventItem = eventTime.timeline.getWindow(eventTime.windowIndex, new Timeline.Window()).mediaItem;
+                // Ignore late decoder callbacks belonging to the preceding stream.
+                if (eventItem.localConfiguration != null && eventItem.localConfiguration.tag == videoStatsTag) {
+                    videoFrameCounter.snapshot(counters);
+                }
+            }
+        });
 
         // Volume normalisation (audio night mode).
         if (nightModeEnabled) {
@@ -139,6 +157,11 @@ public class VideoManager {
         }
 
         mExoPlayer.addListener(new Player.Listener() {
+            @Override
+            public void onMediaItemTransition(@Nullable MediaItem mediaItem, int reason) {
+                videoFrameCounter.reset(mExoPlayer.getVideoDecoderCounters());
+            }
+
             @Override
             public void onPlayerError(@NonNull PlaybackException error) {
                 Timber.e("***** Got error from player");
@@ -199,6 +222,10 @@ public class VideoManager {
 
     public void subscribe(@NonNull PlaybackControllerNotifiable notifier) {
         mPlaybackControllerNotifiable = notifier;
+    }
+
+    public VideoFrameStats getVideoFrameStats() {
+        return videoFrameCounter.snapshot(mExoPlayer != null ? mExoPlayer.getVideoDecoderCounters() : null);
     }
 
     private int determineExoPlayerExtensionRendererMode() {
@@ -414,7 +441,9 @@ public class VideoManager {
                 }
             }
 
+            videoStatsTag = new Object();
             MediaItem mediaItem = new MediaItem.Builder()
+                    .setTag(videoStatsTag)
                     .setUri(Uri.parse(path))
                     .setSubtitleConfigurations(subtitleConfigurations)
                     .build();

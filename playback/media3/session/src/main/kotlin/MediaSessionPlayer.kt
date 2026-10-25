@@ -52,16 +52,17 @@ internal class MediaSessionPlayer(
 	}.launchIn(scope)
 
 	override fun getState(): State = State.Builder().apply {
+		val queueWindow = runBlocking { manager.queue.sessionQueueWindow() }
 		setAvailableCommands(Commands.Builder().apply {
 			add(COMMAND_PLAY_PAUSE)
 			add(COMMAND_PREPARE)
 			add(COMMAND_STOP)
 			add(COMMAND_SEEK_TO_DEFAULT_POSITION)
 			add(COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-			val allowPrevious = manager.queue.entryIndex.value > 0
+			val allowPrevious = queueWindow.hasPrevious
 			addIf(COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM, allowPrevious)
 			addIf(COMMAND_SEEK_TO_PREVIOUS, allowPrevious)
-			val allowNext = manager.queue.entryIndex.value < (manager.queue.estimatedSize - 1)
+			val allowNext = queueWindow.hasNext
 			addIf(COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, allowNext)
 			addIf(COMMAND_SEEK_TO_NEXT, allowNext)
 			// add(COMMAND_SEEK_TO_MEDIA_ITEM)
@@ -88,35 +89,26 @@ internal class MediaSessionPlayer(
 			// add(COMMAND_GET_TRACKS)
 		}.build())
 
-		runBlocking {
-			val current = manager.queue.entry.value
-
-			if (current != null) {
-				val previous = manager.queue.peekPrevious()
-				val next = manager.queue.peekNext()
-
-				val playlist = listOfNotNull(previous, current, next)
-					.distinctBy { it.metadata.mediaId }
-					.map {
-						MediaItemData.Builder(requireNotNull(it.metadata.mediaId)).apply {
-							setMediaItem(it.metadata.toMediaItem())
-							setDurationUs(it.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
-						}.build()
-					}
-				setPlaylist(playlist)
-
-				setPlaybackState(when (state.playState.value) {
-					PlayState.STOPPED -> STATE_IDLE
-					PlayState.PLAYING -> STATE_READY
-					PlayState.PAUSED -> STATE_READY
-					PlayState.ERROR -> STATE_ENDED
-				})
-
-				setCurrentMediaItemIndex(if (previous == null || playlist.size <= 1) 0 else 1)
-			} else {
-				setPlaybackState(STATE_IDLE)
-				setCurrentMediaItemIndex(C.INDEX_UNSET)
+		if (queueWindow.currentIndex >= 0) {
+			val playlist = queueWindow.entries.map {
+				MediaItemData.Builder(it).apply {
+					setMediaItem(it.metadata.toMediaItem())
+					setDurationUs(it.metadata.duration?.inWholeMicroseconds ?: C.TIME_UNSET)
+				}.build()
 			}
+			setPlaylist(playlist)
+
+			setPlaybackState(when (state.playState.value) {
+				PlayState.STOPPED -> STATE_IDLE
+				PlayState.PLAYING -> STATE_READY
+				PlayState.PAUSED -> STATE_READY
+				PlayState.ERROR -> STATE_ENDED
+			})
+
+			setCurrentMediaItemIndex(queueWindow.currentIndex)
+		} else {
+			setPlaybackState(STATE_IDLE)
+			setCurrentMediaItemIndex(C.INDEX_UNSET)
 		}
 
 		setContentPositionMs { state.positionInfo.active.inWholeMilliseconds }

@@ -53,6 +53,8 @@ android {
 
 	buildTypes {
 		release {
+			isDebuggable = false
+			isJniDebuggable = false
 			isMinifyEnabled = true
 			isShrinkResources = true
 			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -83,6 +85,19 @@ android {
 			resValue("string", "app_name", "@string/app_name_debug")
 
 			buildConfigField("boolean", "DEVELOPMENT", (defaultConfig.versionCode!! < 100).toString())
+		}
+
+		create("stats") {
+			initWith(getByName("release"))
+			isDebuggable = false
+			isJniDebuggable = false
+			applicationIdSuffix = ".debug"
+			signingConfig = signingConfigs.getByName("debug")
+			matchingFallbacks += "release"
+			resValue("string", "app_id", "${namespace}.debug")
+			resValue("string", "app_search_suggest_authority", "${namespace}.debug.content")
+			resValue("string", "app_search_suggest_intent_data", "content://${namespace}.debug.content/intent")
+			resValue("string", "app_name", "Jellyfin Stats")
 		}
 	}
 

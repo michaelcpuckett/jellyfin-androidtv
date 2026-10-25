@@ -17,7 +17,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.util.EventLogger
@@ -39,6 +41,7 @@ import org.jellyfin.playback.core.mediastream.mediatype.mediaType
 import org.jellyfin.playback.core.mediastream.normalizationGain
 import org.jellyfin.playback.core.model.PlayState
 import org.jellyfin.playback.core.model.PositionInfo
+import org.jellyfin.playback.core.model.VideoFrameStats
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.support.PlaySupportReport
 import org.jellyfin.playback.core.timedevent.TimedEvent
@@ -66,6 +69,7 @@ class ExoPlayerBackend(
 	private val audioPipeline = ExoPlayerAudioPipeline()
 	private val audioAttributeState = AudioAttributeState()
 	private val timedEventState = TimedEventState()
+	private val videoFrameCounter = VideoFrameCounter()
 	private var lastKnownDuration: Duration? = null
 
 	private val assHandler by lazy {
@@ -137,6 +141,7 @@ class ExoPlayerBackend(
 			.build()
 			.also { player ->
 				player.addListener(PlayerListener())
+				player.addAnalyticsListener(VideoAnalyticsListener())
 
 				if (exoPlayerOptions.enableDebugLogging) {
 					player.addAnalyticsListener(EventLogger())
@@ -189,6 +194,7 @@ class ExoPlayerBackend(
 		override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
 			val queueEntry = mediaItem?.localConfiguration?.tag as? QueueEntry
 			audioPipeline.normalizationGain = queueEntry?.normalizationGain
+			videoFrameCounter.reset(exoPlayer.videoDecoderCounters)
 		}
 
 		override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -200,6 +206,23 @@ class ExoPlayerBackend(
 
 		override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
 			timedEventState.onSeek(oldPosition.positionMs.milliseconds, newPosition.positionMs.milliseconds, lastKnownDuration ?: Duration.ZERO)
+		}
+	}
+
+	private inner class VideoAnalyticsListener : AnalyticsListener {
+		private fun isCurrentItem(eventTime: AnalyticsListener.EventTime): Boolean {
+			if (eventTime.timeline.isEmpty) return false
+			val item = eventTime.timeline.getWindow(eventTime.windowIndex, Timeline.Window()).mediaItem
+			return currentStream != null && item.localConfiguration?.tag === currentStream?.queueEntry
+		}
+
+		override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
+			if (isCurrentItem(eventTime)) videoFrameCounter.snapshot(exoPlayer.videoDecoderCounters)
+		}
+
+		override fun onVideoDisabled(eventTime: AnalyticsListener.EventTime, decoderCounters: DecoderCounters) {
+			// Preserve the final counts before a decoder is replaced, even while the overlay is hidden.
+			if (isCurrentItem(eventTime)) videoFrameCounter.snapshot(decoderCounters)
 		}
 	}
 
@@ -251,6 +274,7 @@ class ExoPlayerBackend(
 		if (currentStream == stream) return
 
 		currentStream = stream
+		videoFrameCounter.reset(exoPlayer.videoDecoderCounters)
 
 		var preparedItemIndex = (0 until exoPlayer.mediaItemCount).firstOrNull { index ->
 			exoPlayer.getMediaItemAt(index).mediaId == stream.hashCode().toString()
@@ -305,6 +329,7 @@ class ExoPlayerBackend(
 	override fun stop() {
 		exoPlayer.stop()
 		currentStream = null
+		videoFrameCounter.reset()
 	}
 
 	override fun seekTo(position: Duration) {
@@ -332,6 +357,11 @@ class ExoPlayerBackend(
 		buffer = exoPlayer.bufferedPosition.milliseconds,
 		duration = lastKnownDuration ?: Duration.ZERO,
 	)
+
+	override fun getVideoFrameStats(): VideoFrameStats? {
+		if (currentStream?.queueEntry?.mediaType != MediaType.Video) return null
+		return videoFrameCounter.snapshot(exoPlayer.videoDecoderCounters)
+	}
 
 	override fun setTimedEvents(timedEvents: List<TimedEvent>) {
 		timedEventState.setTimedEvents(exoPlayer, timedEvents)

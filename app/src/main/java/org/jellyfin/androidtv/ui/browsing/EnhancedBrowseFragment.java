@@ -345,6 +345,7 @@ public class EnhancedBrowseFragment extends Fragment implements RowLoader, View.
 
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
+        if (getView() == null || !getView().hasFocus()) return false;
         if (event.getAction() != KeyEvent.ACTION_UP) return false;
         return keyProcessor.getValue().handleKey(keyCode, mCurrentItem, requireActivity());
     }
