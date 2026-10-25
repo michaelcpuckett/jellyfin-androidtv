@@ -3,7 +3,6 @@ package org.jellyfin.androidtv.integration.dream.composable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
@@ -45,11 +44,7 @@ fun DreamContentLibraryShowcase(
 	}
 
 	// Overlay
-	Row(
-		modifier = Modifier
-			.align(Alignment.BottomStart)
-			.overscan(),
-	) {
+	DreamDrift(Modifier.overscan()) {
 		if (content.logo != null) {
 			BoxWithConstraints {
 				Image(
