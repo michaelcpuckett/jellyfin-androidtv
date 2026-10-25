@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.findViewTreeCompositionContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -405,15 +406,18 @@ private fun CardViewHolderContent(
 
 		Column(Modifier.width(size.width)) {
 			card()
-			Column(Modifier.fillMaxWidth().height(42.dp).padding(top = 8.dp)) {
+			Column(Modifier.fillMaxWidth().height(42.dp)
+				.background(if (focused && homeLayout) Color(0x221282B4) else Color.Transparent, artworkShape)
+				.padding(top = 8.dp)) {
 				Text(
 					text = title.orEmpty(),
 					fontSize = 12.sp,
+					fontWeight = if (focused) FontWeight.Medium else FontWeight.Normal,
 					lineHeight = 16.sp,
 					color = if (focused) Color.White else Color(0xFFD6D7DA),
 					maxLines = 1,
 					overflow = TextOverflow.Ellipsis,
-					textAlign = if (libraryWidth > 0) TextAlign.Start else TextAlign.Center,
+					textAlign = if (libraryWidth > 0 || homeLayout) TextAlign.Start else TextAlign.Center,
 					modifier = Modifier.fillMaxWidth().then(focusModifier),
 				)
 				Spacer(Modifier.height(2.dp))
@@ -421,10 +425,10 @@ private fun CardViewHolderContent(
 					text = subtitle.orEmpty(),
 					fontSize = 11.sp,
 					lineHeight = 14.sp,
-					color = Color(0xFF999CA1),
+					color = if (focused && homeLayout) Color(0xFF8BCDE8) else Color(0xFF999CA1),
 					maxLines = 1,
 					overflow = TextOverflow.Ellipsis,
-					textAlign = if (libraryWidth > 0) TextAlign.Start else TextAlign.Center,
+					textAlign = if (libraryWidth > 0 || homeLayout) TextAlign.Start else TextAlign.Center,
 					modifier = Modifier.fillMaxWidth().then(focusModifier),
 				)
 			}

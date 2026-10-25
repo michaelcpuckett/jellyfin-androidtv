@@ -3,12 +3,14 @@ package org.jellyfin.androidtv.ui.settings.screen.home
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.base.Text
+import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
@@ -38,6 +40,28 @@ fun SettingsHomeScreen() {
 				captionContent = { Text(stringResource(userSettingPreferences[section].nameRes)) },
 				onClick = { router.push(Routes.HOME_SECTION, mapOf("index" to index.toString())) },
 				modifier = Modifier.focusKey("home_section_$index")
+			)
+		}
+
+		item { ListSection(headingContent = { Text(stringResource(R.string.home_appearance_discovery)) }) }
+		item {
+			var enabled by rememberPreference(userPreferences, UserPreferences.homeCinematicPreview)
+			ListButton(
+				headingContent = { Text(stringResource(R.string.home_cinematic_preview)) },
+				captionContent = { Text(stringResource(R.string.home_cinematic_preview_description)) },
+				trailingContent = { Checkbox(checked = enabled) },
+				onClick = { enabled = !enabled },
+				modifier = Modifier.focusKey("home_cinematic_preview"),
+			)
+		}
+		item {
+			var enabled by rememberPreference(userPreferences, UserPreferences.homeDiscoveryEnabled)
+			ListButton(
+				headingContent = { Text(stringResource(R.string.home_discovery)) },
+				captionContent = { Text(stringResource(R.string.home_discovery_description)) },
+				trailingContent = { Checkbox(checked = enabled) },
+				onClick = { enabled = !enabled },
+				modifier = Modifier.focusKey("home_discovery_enabled"),
 			)
 		}
 
