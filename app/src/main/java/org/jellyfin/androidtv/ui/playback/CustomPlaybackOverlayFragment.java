@@ -137,6 +137,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     private final Lazy<ImageHelper> imageHelper = inject(ImageHelper.class);
 
     private final PlaybackOverlayFragmentHelper helper = new PlaybackOverlayFragmentHelper(this);
+    private RegularPlaybackInfoOverlay playbackInfoOverlay;
+
+    public void togglePlaybackInfo() {
+        if (playbackInfoOverlay != null) playbackInfoOverlay.toggle();
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -211,6 +216,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        playbackInfoOverlay = new RegularPlaybackInfoOverlay(binding.playbackInfo,
+                () -> playbackControllerContainer.getValue().getPlaybackController());
 
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) {
             Utils.showToast(requireContext(), getString(R.string.msg_no_playable_items));
@@ -227,6 +234,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
     @Override
     public void onDestroyView() {
+        if (playbackInfoOverlay != null) playbackInfoOverlay.pause();
+        playbackInfoOverlay = null;
         super.onDestroyView();
 
         binding = null;
@@ -406,6 +415,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
+        if (handleControlsKey(keyCode, event)) return true;
         if (event.isLongPress()) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                 if (mSelectedProgramView instanceof ProgramGridCell)
@@ -471,9 +481,25 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         }
     }
 
+    private final PlaybackControlsKeyHandler controlsKeyHandler = new PlaybackControlsKeyHandler();
+
+    private boolean handleControlsKey(int keyCode, KeyEvent event) {
+        if (binding == null || leanbackOverlayFragment == null) return false;
+        boolean controlsOrSpecialUiVisible = leanbackOverlayFragment.isControlsOverlayVisible()
+                || mGuideVisible || mPopupPanelVisible || binding.skipOverlay.getVisible();
+        if (!controlsKeyHandler.onKey(keyCode, event.getAction(), event.getRepeatCount(), controlsOrSpecialUiVisible)) return false;
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            leanbackOverlayFragment.setShouldShowOverlay(true);
+            leanbackOverlayFragment.revealPlaybackControls();
+            startFadeTimer();
+        }
+        return true;
+    }
+
     private View.OnKeyListener keyListener = new View.OnKeyListener() {
         @Override
         public boolean onKey(View v, int keyCode, KeyEvent event) {
+            if (handleControlsKey(keyCode, event)) return true;
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if (!mGuideVisible)
                     leanbackOverlayFragment.setShouldShowOverlay(true);
@@ -599,13 +625,6 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                             }
                         }
 
-                        if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
-                                && playbackControllerContainer.getValue().getPlaybackController().canSeek()) {
-                            // if the player is playing and the overlay is hidden, this will pause
-                            // if the player is paused and then 'back' is pressed to hide the overlay, this will play
-                            playbackControllerContainer.getValue().getPlaybackController().playPause();
-                            return true;
-                        }
                     }
 
                     //and then manage our fade timer
@@ -660,6 +679,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     @Override
     public void onResume() {
         super.onResume();
+        if (playbackInfoOverlay != null) playbackInfoOverlay.resume();
 
         // Close player when resuming without a valid playback controller
         if (playbackControllerContainer.getValue().getPlaybackController() == null || !playbackControllerContainer.getValue().getPlaybackController().hasFragment()) {
@@ -685,6 +705,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
     @Override
     public void onPause() {
+        controlsKeyHandler.reset();
+        if (playbackInfoOverlay != null) playbackInfoOverlay.pause();
         super.onPause();
         if (mItemsToPlay == null || mItemsToPlay.isEmpty()) return;
 

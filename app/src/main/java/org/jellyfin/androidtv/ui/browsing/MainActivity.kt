@@ -26,10 +26,12 @@ import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProvideLocalInteractionTracker
 import org.jellyfin.androidtv.ui.composable.compat.AppNavigationHost
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.screensaver.InAppScreensaver
 import org.jellyfin.androidtv.ui.settings.compat.MainActivitySettings
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.applyTheme
+import org.jellyfin.playback.media3.session.MediaSkipKeyHandler
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
@@ -40,6 +42,12 @@ class MainActivity : FragmentActivity() {
 	private val userRepository by inject<UserRepository>()
 	private val interactionTrackerViewModel by viewModel<InteractionTrackerViewModel>()
 	private val workManager by inject<WorkManager>()
+	private val mediaManager by inject<MediaManager>()
+	private val audioSkipKeys = MediaSkipKeyHandler(
+		hasQueue = { mediaManager.hasAudioQueueItems() },
+		next = { mediaManager.nextAudioItem() },
+		previous = { mediaManager.prevAudioItem() },
+	)
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		applyTheme()
@@ -117,6 +125,10 @@ class MainActivity : FragmentActivity() {
 	}
 
 	// Forward key events to fragments
+	// Software remotes may inject keys into the activity instead of Android's media session.
+	// Consume both halves before the selected screen can also advance the queue on key-up.
+	override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+		audioSkipKeys.onKey(event.keyCode, event.action, event.repeatCount, event.isCanceled) || super.dispatchKeyEvent(event)
 
 	private fun Fragment.onKeyEvent(keyCode: Int, event: KeyEvent?): Boolean {
 		var result = childFragmentManager.fragments.any { it.onKeyEvent(keyCode, event) }

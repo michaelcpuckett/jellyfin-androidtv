@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.composable.rememberQueueEntry
@@ -21,6 +23,7 @@ import org.jellyfin.playback.core.mediastream.MediaConversionMethod
 import org.jellyfin.playback.core.mediastream.MediaStreamAudioTrack
 import org.jellyfin.playback.core.mediastream.MediaStreamVideoTrack
 import org.jellyfin.playback.core.mediastream.mediaStreamFlow
+import org.jellyfin.playback.core.model.VideoFrameStats
 
 @Composable
 fun PlaybackInfoOverlay(
@@ -30,6 +33,12 @@ fun PlaybackInfoOverlay(
 	val entry by rememberQueueEntry(playbackManager)
 	val mediaStream by entry?.mediaStreamFlow?.collectAsState(null) ?: return
 	val stream = mediaStream ?: return
+	val frameStats by produceState<VideoFrameStats?>(null, playbackManager, entry) {
+		while (true) {
+			value = playbackManager.backend.getVideoFrameStats()
+			delay(1_000)
+		}
+	}
 
 	val videoTrack = stream.tracks.filterIsInstance<MediaStreamVideoTrack>().firstOrNull()
 	val audioTrack = stream.tracks.filterIsInstance<MediaStreamAudioTrack>().firstOrNull()
@@ -63,6 +72,10 @@ fun PlaybackInfoOverlay(
 				InfoText(stringResource(R.string.playback_info_bitrate, formatBitrate(videoTrack.bitrate)))
 			}
 			videoTrack.videoRange?.let { InfoText(stringResource(R.string.playback_info_video_range, it)) }
+			frameStats?.let {
+				InfoText(stringResource(R.string.playback_info_dropped_frames, it.droppedFrames))
+				InfoText(stringResource(R.string.playback_info_rendered_frames, it.renderedFrames))
+			}
 		}
 
 		// Audio info

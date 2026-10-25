@@ -34,6 +34,7 @@ import org.jellyfin.androidtv.ui.playback.overlay.action.CustomAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.FastForwardAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.GuideAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.PlayPauseAction;
+import org.jellyfin.androidtv.ui.playback.overlay.action.PlaybackInfoAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.PlaybackSpeedAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.PreviousLiveTvChannelAction;
 import org.jellyfin.androidtv.ui.playback.overlay.action.RecordAction;
@@ -63,6 +64,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
     private PlaybackSpeedAction playbackSpeedAction;
     private ZoomAction zoomAction;
     private ChapterAction chapterAction;
+    private PlaybackInfoAction playbackInfoAction;
 
     // TV actions
     private PreviousLiveTvChannelAction previousLiveTvChannelAction;
@@ -187,6 +189,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
     }
 
     private void initActions(Context context) {
+        playbackInfoAction = new PlaybackInfoAction(context, this);
         playPauseAction = new PlayPauseAction(context);
         rewindAction = new RewindAction(context);
         fastForwardAction = new FastForwardAction(context);
@@ -283,6 +286,7 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         }
 
         secondaryActionsAdapter.add(zoomAction);
+        secondaryActionsAdapter.add(playbackInfoAction);
     }
 
     @Override

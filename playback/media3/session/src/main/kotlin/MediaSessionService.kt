@@ -9,9 +9,11 @@ import androidx.core.net.toUri
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.launch
 import org.jellyfin.playback.core.plugin.PlayerService
 import org.jellyfin.playback.core.queue.QueueEntry
 import org.jellyfin.playback.core.queue.metadata
@@ -25,6 +27,7 @@ class MediaSessionService(
 	private val notificationManager = NotificationManagerCompat.from(androidContext)
 	private var notifiedNotificationId: Int? = null
 
+	@OptIn(UnstableApi::class)
 	override suspend fun onInitialize() {
 		val player = MediaSessionPlayer(
 			looper = Looper.getMainLooper(),
@@ -35,6 +38,11 @@ class MediaSessionService(
 		val session = MediaSession.Builder(androidContext, player).apply {
 			setId(options.notificationId.toString())
 			setSessionActivity(options.openIntent)
+			setCallback(MediaSkipSessionCallback(MediaSkipKeyHandler(
+				hasQueue = { manager.queue.entry.value != null },
+				next = { coroutineScope.launch(Dispatchers.Main) { manager.queue.next() } },
+				previous = { coroutineScope.launch(Dispatchers.Main) { manager.queue.previous() } },
+			)))
 		}.build()
 
 		manager.queue.entry.onEach { item ->

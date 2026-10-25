@@ -38,6 +38,11 @@ object Destinations {
 	}
 
 	// Browsing
+	fun libraryPosterGrid(item: BaseItemDto) = fragmentDestination<BrowseGridFragment> {
+		putString(Extras.Folder, Json.encodeToString(item))
+		putBoolean(Extras.PosterGrid, true)
+	}
+
 	// TODO only pass item id instead of complete JSON to browsing destinations
 	fun libraryBrowser(item: BaseItemDto, includeType: String? = null) =
 		fragmentDestination<BrowseGridFragment> {

@@ -120,4 +120,21 @@
         android:id="@+id/skip_overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/playback_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="48dp"
+        android:layout_marginTop="160dp"
+        android:maxWidth="560dp"
+        android:background="#CC000000"
+        android:padding="12dp"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        android:lineSpacingExtra="2dp"
+        android:focusable="false"
+        android:clickable="false"
+        android:visibility="gone" />
 </FrameLayout>

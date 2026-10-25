@@ -353,6 +353,14 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 					if (backdropEnabled) BackdropBehavior.BACKDROP_WITH_BLUR.name else BackdropBehavior.DISABLED.name
 				)
 			}
+
+			// Move previous custom debug installations to the regular player once.
+			migration(toVersion = 10) {
+				if (org.jellyfin.androidtv.BuildConfig.BUILD_TYPE == "stats") {
+					putBoolean("playback_new", false)
+					putBoolean("pref_enable_debug", false)
+				}
+			}
 		}
 	}
 }

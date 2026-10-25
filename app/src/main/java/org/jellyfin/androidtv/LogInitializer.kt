@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv
 
 import android.content.Context
+import android.util.Log
 import androidx.startup.Initializer
 import timber.log.Timber
 
@@ -20,8 +21,16 @@ class LogInitializer : Initializer<Unit> {
 		}
 
 		// Initialize the logging library
-		Timber.plant(Timber.DebugTree())
-		Timber.i("Debug tree planted")
+		if (BuildConfig.DEBUG) {
+			Timber.plant(Timber.DebugTree())
+		} else {
+			Timber.plant(object : Timber.Tree() {
+				override fun isLoggable(tag: String?, priority: Int) = priority >= Log.WARN
+				override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+					Log.println(priority, tag ?: "Jellyfin", message)
+				}
+			})
+		}
 	}
 
 	override fun dependencies() = emptyList<Class<out Initializer<*>>>()

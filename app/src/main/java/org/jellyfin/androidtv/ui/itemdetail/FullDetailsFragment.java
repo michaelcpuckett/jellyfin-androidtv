@@ -110,6 +110,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
     TextUnderButton mResumeButton;
     private TextUnderButton mVersionsButton;
+    TextUnderButton fileInfoButton;
     TextUnderButton mPrevButton;
     private TextUnderButton mRecordButton;
     private TextUnderButton mRecSeriesButton;
@@ -855,6 +856,12 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             mDetailsOverviewRow.addAction(mVersionsButton);
         }
 
+        if (MediaFileInfoDialogFragment.canShow(mBaseItem)) {
+            fileInfoButton = TextUnderButton.create(requireContext(), R.drawable.ic_info, buttonSize, 0,
+                    getString(R.string.file_info), v -> MediaFileInfoDialogFragment.show(getParentFragmentManager(), mBaseItem));
+            mDetailsOverviewRow.addAction(fileInfoButton);
+        }
+
         if (TrailerUtils.hasPlayableTrailers(requireContext(), mBaseItem)) {
             trailerButton = TextUnderButton.create(requireContext(), R.drawable.ic_trailer, buttonSize, 0, getString(R.string.lbl_play_trailers), new View.OnClickListener() {
                 @Override
@@ -1125,6 +1132,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
         List<TextUnderButton> actionsList = new ArrayList<>();
         // added in order of priority (should match res/menu/menu_details_more.xml)
+        if (fileInfoButton != null) actionsList.add(fileInfoButton);
         if (queueButton != null) actionsList.add(queueButton);
         if (trailerButton != null) actionsList.add(trailerButton);
         if (shuffleButton != null) actionsList.add(shuffleButton);

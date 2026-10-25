@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import android.view.View
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ListRow
+import androidx.leanback.widget.ListRowPresenter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
@@ -27,6 +28,7 @@ import kotlinx.coroutines.withTimeout
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
+import org.jellyfin.androidtv.constant.ImageType
 import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
@@ -82,6 +84,46 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var currentItem: BaseRowItem? = null
 	private var currentRow: ListRow? = null
 	private var justLoaded = true
+	internal var onFocusSidebar: (() -> Boolean)? = null
+	internal var onFocusToolbar: (() -> Boolean)? = null
+	internal var onItemFocused: ((BaseRowItem?) -> Unit)? = null
+	internal val selectedItem get() = currentItem
+
+	internal fun focusTargetForKey(keyCode: Int): HomeFocusTarget? {
+		val grid = verticalGridView ?: return null
+		val rowHolder = getRowViewHolder(selectedPosition) as? ListRowPresenter.ViewHolder
+		return homeFocusTarget(keyCode, selectedPosition, rowHolder?.gridView?.selectedPosition ?: -1, grid.layoutDirection)
+	}
+
+	/** Re-enter the selected card, rather than resetting the dashboard to its first row. */
+	internal fun requestContentFocus(): Boolean {
+		val grid = verticalGridView ?: return false
+		val rowHolder = getRowViewHolder(selectedPosition) as? ListRowPresenter.ViewHolder
+		val rowGrid = rowHolder?.gridView
+		val selectedCard = rowGrid?.findViewHolderForAdapterPosition(rowGrid.selectedPosition)?.itemView
+		if (selectedCard?.requestFocus() == true) return true
+		return grid.requestFocus()
+	}
+
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
+		verticalGridView?.setOnKeyInterceptListener { event ->
+			if (event.action != KeyEvent.ACTION_DOWN) false
+			else when (focusTargetForKey(event.keyCode)) {
+				HomeFocusTarget.Sidebar -> onFocusSidebar?.invoke() ?: false
+				HomeFocusTarget.Toolbar -> onFocusToolbar?.invoke() ?: false
+				null -> false
+			}
+		}
+	}
+
+	override fun onDestroyView() {
+		verticalGridView?.setOnKeyInterceptListener(null)
+		onFocusSidebar = null
+		onFocusToolbar = null
+		onItemFocused = null
+		super.onDestroyView()
+	}
 
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
@@ -98,7 +140,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			}
 
 			// Start out with default sections
-			val homesections = userSettingPreferences.activeHomesections
+			val homesections = homeDashboardSections(userSettingPreferences.activeHomesections)
 
 			// Make sure the rows are empty
 			val rows = mutableListOf<HomeFragmentRow>()
@@ -126,7 +168,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
-				val cardPresenter = CardPresenter()
+				val cardPresenter = CardPresenter(true, ImageType.POSTER, 180, false, homeLayout = true)
 
 				// Add rows in order
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
@@ -182,6 +224,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
+		if (verticalGridView?.hasFocus() != true) return false
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
 	}
@@ -274,10 +317,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		) {
 			if (item !is BaseRowItem) {
 				currentItem = null
+				onItemFocused?.invoke(null)
 				//fill in default background
 				backgroundService.clearBackgrounds()
 			} else {
 				currentItem = item
+				onItemFocused?.invoke(item)
 				currentRow = row as ListRow
 
 				val itemRowAdapter = row.adapter as? ItemRowAdapter

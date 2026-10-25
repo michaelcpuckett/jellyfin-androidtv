@@ -1,22 +1,35 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.referentialEqualityPolicy
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.fragment.app.Fragment
 import androidx.fragment.compose.AndroidFragment
 import androidx.fragment.compose.content
@@ -29,6 +42,8 @@ import kotlinx.coroutines.flow.onEach
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
+import org.jellyfin.androidtv.ui.browsing.focusNavigationSidebar
+import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
@@ -44,51 +59,79 @@ class HomeFragment : Fragment() {
 		savedInstanceState: Bundle?
 	) = content {
 		val rowsFocusRequester = remember { FocusRequester() }
-		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
+		val toolbarFocusRequester = remember { FocusRequester() }
+		var rowsSupportFragment by remember { mutableStateOf<HomeRowsFragment?>(null) }
+		var selectedItem by remember { mutableStateOf<BaseRowItem?>(null, referentialEqualityPolicy()) }
+		var focusArea by rememberSaveable { mutableStateOf("content") }
+		val initialFocusArea = remember { focusArea }
+		var rowsHaveFocus by remember { mutableStateOf(false) }
+		val requestContentFocus = { rowsSupportFragment?.requestContentFocus() ?: false }
+		val requestSidebarFocus = { view?.focusNavigationSidebar() ?: false }
+		val requestToolbarFocus = { toolbarFocusRequester.requestFocus() }
 
-		Column {
-			MainToolbar(MainToolbarActiveButton.Home)
+		LaunchedEffect(rowsSupportFragment) {
+			if (rowsSupportFragment != null) {
+				if (initialFocusArea == "toolbar") requestToolbarFocus()
+				else rowsFocusRequester.requestFocus()
+			}
+		}
+		BackHandler(rowsHaveFocus) { requestSidebarFocus() }
 
-			// The leanback code has its own awful focus handling that doesn't work properly with Compose view inteop to workaround this
-			// issue we add custom behavior that only allows focus exit when the current selected row is the first one. Additionally when
-			// we do switch the focus, we reset the leanback state so it won't cause weird behavior when focus is regained
-			var rowsSupportFragment by remember { mutableStateOf<HomeRowsFragment?>(null) }
+		Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color(0xFF101114).copy(alpha = 0.86f), Color(0xFF101114))))) {
+			Column(
+				Modifier
+					.focusRequester(toolbarFocusRequester)
+					.onFocusChanged { if (it.hasFocus) focusArea = "toolbar" }
+					.onPreviewKeyEvent { it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown && requestContentFocus() }
+					.focusGroup()
+			) {
+				MainToolbar(MainToolbarActiveButton.Home)
+			}
+			HomeSelectionDetails(selectedItem)
 			AndroidFragment<HomeRowsFragment>(
 				modifier = Modifier
-					.focusGroup()
+					.weight(1f)
 					.focusRequester(rowsFocusRequester)
+					.onFocusChanged {
+						rowsHaveFocus = it.hasFocus
+						if (it.hasFocus) focusArea = "content"
+					}
 					.focusProperties {
 						onExit = {
-							val isFirstRowSelected = rowsSupportFragment?.selectedPosition?.let { it <= 0 } ?: false
-							if (requestedFocusDirection != FocusDirection.Up || !isFirstRowSelected) {
-								cancelFocusChange()
-							} else {
-								rowsSupportFragment?.selectedPosition = 0
-								rowsSupportFragment?.verticalGridView?.clearFocus()
+							val keyCode = when (requestedFocusDirection) {
+								FocusDirection.Left -> KeyEvent.KEYCODE_DPAD_LEFT
+								FocusDirection.Right -> KeyEvent.KEYCODE_DPAD_RIGHT
+								FocusDirection.Up -> KeyEvent.KEYCODE_DPAD_UP
+								FocusDirection.Down -> KeyEvent.KEYCODE_DPAD_DOWN
+								else -> null
+							}
+							if (keyCode != null) when (rowsSupportFragment?.focusTargetForKey(keyCode)) {
+								HomeFocusTarget.Sidebar -> if (!requestSidebarFocus()) cancelFocusChange()
+								HomeFocusTarget.Toolbar -> if (!requestToolbarFocus()) cancelFocusChange()
+								null -> cancelFocusChange()
 							}
 						}
 					}
+					.focusGroup()
 					.fillMaxSize(),
 				maxLifecycle = Lifecycle.State.RESUMED,
 				onUpdate = { fragment ->
 					rowsSupportFragment = fragment
-				}
+					fragment.onFocusSidebar = requestSidebarFocus
+					fragment.onFocusToolbar = requestToolbarFocus
+					fragment.onItemFocused = { selectedItem = it }
+					selectedItem = fragment.selectedItem
+				},
 			)
 		}
 	}
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
-
 		sessionRepository.currentSession
 			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
-			.map { session ->
-				if (session == null) null
-				else serverRepository.getServer(session.serverId)
-			}
-			.onEach { server ->
-				notificationRepository.updateServerNotifications(server)
-			}
+			.map { session -> if (session == null) null else serverRepository.getServer(session.serverId) }
+			.onEach { server -> notificationRepository.updateServerNotifications(server) }
 			.launchIn(viewLifecycleOwner.lifecycleScope)
 	}
 }
