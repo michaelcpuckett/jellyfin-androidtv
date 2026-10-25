@@ -97,7 +97,7 @@ android {
 			resValue("string", "app_id", "${namespace}.debug")
 			resValue("string", "app_search_suggest_authority", "${namespace}.debug.content")
 			resValue("string", "app_search_suggest_intent_data", "content://${namespace}.debug.content/intent")
-			resValue("string", "app_name", "Jellyfin Stats")
+			resValue("string", "app_name", "@string/app_name_release")
 		}
 	}
 
