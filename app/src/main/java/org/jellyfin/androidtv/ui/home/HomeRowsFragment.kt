@@ -16,6 +16,8 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -84,6 +86,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var currentItem: BaseRowItem? = null
 	private var currentRow: ListRow? = null
 	private var justLoaded = true
+	private var homeRowsLoaded = false
+	private var discoveryEnabled = false
+	private var discoveryJob: Job? = null
+	private val discoveryRows = mutableListOf<Row>()
 	internal var onFocusSidebar: (() -> Boolean)? = null
 	internal var onFocusToolbar: (() -> Boolean)? = null
 	internal var onItemFocused: ((BaseRowItem?) -> Unit)? = null
@@ -186,6 +192,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 						if (previousRow != null) itemAdapter.setSiblingRow(previousRow)
 					}
 				}
+				homeRowsLoaded = true
+				updateDiscoveryRows()
 			}
 		}
 
@@ -231,6 +239,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onResume() {
 		super.onResume()
+		// Home owns a single bounded preview; avoid also loading every full-screen backdrop.
+		backgroundService.clearBackgrounds()
+		backgroundService.disable()
+		updateDiscoveryRows()
 
 		//React to deletion
 		if (currentRow != null && currentItem != null && currentItem?.baseItem != null && currentItem!!.baseItem!!.id == dataRefreshService.lastDeletedItemId) {
@@ -267,6 +279,38 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter
 				if (force) rowAdapter?.Retrieve()
 				else rowAdapter?.ReRetrieveIfNeeded()
+			}
+		}
+	}
+
+	@Suppress("UNCHECKED_CAST")
+	private fun updateDiscoveryRows() {
+		if (!homeRowsLoaded) return
+		val enabled = userPreferences[UserPreferences.homeDiscoveryEnabled]
+		if (enabled == discoveryEnabled) return
+		discoveryEnabled = enabled
+		discoveryJob?.cancel()
+		val rowsAdapter = adapter as MutableObjectAdapter<Row>
+		discoveryRows.forEach(rowsAdapter::remove)
+		discoveryRows.clear()
+		if (!enabled) return
+		discoveryJob = lifecycleScope.launch {
+			try {
+				val context = requireContext()
+				val definitions = withContext(Dispatchers.IO) {
+					loadHomeDiscoveryRows(context, api, userViewsRepository.views.first(),
+						userRepository.currentUser.value?.configuration?.latestItemsExcludes.orEmpty())
+				}
+				val presenter = CardPresenter(true, ImageType.POSTER, 180, false, homeLayout = true)
+				definitions.forEach { definition ->
+					HomeFragmentBrowseRowDefRow(definition).addToRowsAdapter(context, presenter, rowsAdapter)
+					rowsAdapter[rowsAdapter.size() - 1]?.let(discoveryRows::add)
+				}
+			} catch (cancelled: CancellationException) {
+				throw cancelled
+			} catch (error: Exception) {
+				discoveryEnabled = false // Allow a later resume to retry without breaking normal rows.
+				Timber.w(error, "Could not load optional Home discovery rows")
 			}
 		}
 	}
@@ -318,8 +362,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (item !is BaseRowItem) {
 				currentItem = null
 				onItemFocused?.invoke(null)
-				//fill in default background
-				backgroundService.clearBackgrounds()
 			} else {
 				currentItem = item
 				onItemFocused?.invoke(item)
@@ -328,7 +370,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
 
-				backgroundService.setBackground(item.baseItem)
 			}
 		}
 	}

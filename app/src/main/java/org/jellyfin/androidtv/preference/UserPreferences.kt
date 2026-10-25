@@ -50,6 +50,9 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 */
 		var backdropBehavior = enumPreference("backdrop_behavior", BackdropBehavior.BACKDROP_WITH_BLUR)
 
+		val homeCinematicPreview = booleanPreference("home_cinematic_preview", true)
+		val homeDiscoveryEnabled = booleanPreference("home_discovery_enabled", false)
+
 		/* Playback - General*/
 		/**
 		 * Maximum bitrate in megabit for playback.
