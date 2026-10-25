@@ -8,13 +8,11 @@ import coil3.ImageLoader
 import coil3.request.ImageRequest
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.cancellable
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -26,9 +24,6 @@ import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
-import org.jellyfin.playback.core.PlaybackManager
-import org.jellyfin.playback.core.queue.queue
-import org.jellyfin.playback.jellyfin.queue.baseItem
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.extensions.itemsApi
@@ -46,19 +41,8 @@ class DreamViewModel(
 	private val api: ApiClient,
 	private val imageLoader: ImageLoader,
 	private val context: Context,
-	playbackManager: PlaybackManager,
 	private val userPreferences: UserPreferences,
 ) : ViewModel() {
-	@OptIn(ExperimentalCoroutinesApi::class)
-	private val _mediaContent = playbackManager.queue.entry
-		.map { entry ->
-			entry
-				?.takeIf { it.visibleInScreensaver }
-				?.baseItem
-				?.let { baseItem -> DreamContent.NowPlaying(entry, baseItem) }
-		}
-		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
-
 	private val _libraryContent = flow {
 		// Load first library item after 2 seconds
 		// to force the logo at the start of the screensaver
@@ -82,12 +66,14 @@ class DreamViewModel(
 		.distinctUntilChanged()
 		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
 
-	val content = combine(_mediaContent, _libraryContent) { mediaContent, libraryContent ->
-		mediaContent ?: libraryContent ?: DreamContent.Logo
+	// A queued or paused song must not replace the screensaver with stationary player UI.
+	// Playback keeps running independently; always rotate library art (or the drifting fallback logo).
+	val content = _libraryContent.map { libraryContent ->
+		libraryContent ?: DreamContent.Logo
 	}.stateIn(
 		scope = viewModelScope,
 		started = SharingStarted.WhileSubscribed(),
-		initialValue = _mediaContent.value ?: _libraryContent.value ?: DreamContent.Logo,
+		initialValue = _libraryContent.value ?: DreamContent.Logo,
 	)
 
 	private fun getRandomLibraryShowcaseItems(
