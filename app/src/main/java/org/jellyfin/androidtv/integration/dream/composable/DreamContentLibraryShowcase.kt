@@ -44,7 +44,7 @@ fun DreamContentLibraryShowcase(
 	}
 
 	// Overlay
-	DreamDrift(Modifier.overscan()) {
+	Box(Modifier.align(Alignment.BottomStart).overscan()) {
 		if (content.logo != null) {
 			BoxWithConstraints {
 				Image(

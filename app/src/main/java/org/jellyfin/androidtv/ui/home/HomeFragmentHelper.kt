@@ -46,6 +46,14 @@ class HomeFragmentHelper(
 		return loadResume(context.getString(R.string.continue_listening), listOf(MediaType.AUDIO))
 	}
 
+	fun loadRecentlyWatched(): HomeFragmentRow {
+		val userId = requireNotNull(userRepository.currentUser.value).id
+		return HomeFragmentBrowseRowDefRow(BrowseRowDef(
+			context.getString(R.string.home_recently_watched), homeRecentlyWatchedRequest(userId), 0,
+			false, true, arrayOf(ChangeTriggerType.TvPlayback, ChangeTriggerType.MoviePlayback, ChangeTriggerType.LibraryUpdated),
+		))
+	}
+
 	fun loadLatestLiveTvRecordings(): HomeFragmentRow {
 		val query = GetRecordingsRequest(
 			fields = ItemRepository.itemFields,

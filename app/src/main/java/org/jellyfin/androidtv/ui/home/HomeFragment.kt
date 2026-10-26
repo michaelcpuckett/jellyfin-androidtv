@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -84,6 +85,8 @@ class HomeFragment : Fragment() {
 			Column(Modifier.fillMaxSize().background(Color(0xFF10151E))) {
 				Column(
 					Modifier
+						.zIndex(1f)
+						.background(Color(0xFF10151E))
 						.focusRequester(toolbarFocusRequester)
 						.onFocusChanged { if (it.hasFocus) focusArea = "toolbar" }
 						.onPreviewKeyEvent { it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown && requestContentFocus() }

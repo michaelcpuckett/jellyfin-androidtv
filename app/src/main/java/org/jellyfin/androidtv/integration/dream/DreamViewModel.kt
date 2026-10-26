@@ -67,7 +67,7 @@ class DreamViewModel(
 		.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
 
 	// A queued or paused song must not replace the screensaver with stationary player UI.
-	// Playback keeps running independently; always rotate library art (or the drifting fallback logo).
+	// Playback keeps running independently; always rotate library art (or show the fallback logo).
 	val content = _libraryContent.map { libraryContent ->
 		libraryContent ?: DreamContent.Logo
 	}.stateIn(
