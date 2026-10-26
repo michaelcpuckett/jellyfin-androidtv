@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="category_shuffle_limit">Shuffle %1$d</string>
+    <string name="category_playback_failed">Could not load items to play. Please try again.</string>
+    <string name="category_play_music">Play music</string>
+    <string name="category_play_videos">Play videos</string>
+</resources>
