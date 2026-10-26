@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -21,7 +22,7 @@ fun DreamContentLogo() = Box(
 		.fillMaxSize()
 		.background(Color.Black),
 ) {
-	DreamDrift(Modifier.overscan()) {
+	Box(Modifier.align(Alignment.BottomStart).overscan()) {
 		Image(
 			painter = painterResource(R.drawable.app_logo),
 			contentDescription = stringResource(R.string.app_name),

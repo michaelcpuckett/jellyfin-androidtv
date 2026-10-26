@@ -54,6 +54,7 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.ui.presentation.PositionableListRowPresenter
+import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
 import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
@@ -61,6 +62,7 @@ import org.jellyfin.sdk.api.sockets.subscribe
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
 
@@ -79,6 +81,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
+	private val settingsViewModel by activityViewModel<SettingsViewModel>()
 
 	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, userPreferences) }
 
@@ -90,6 +93,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var discoveryEnabled = false
 	private var discoveryJob: Job? = null
 	private val discoveryRows = mutableListOf<Row>()
+	private var recentlyWatchedRow: ListRow? = null
 	internal var onFocusSidebar: (() -> Boolean)? = null
 	internal var onFocusToolbar: (() -> Boolean)? = null
 	internal var onItemFocused: ((BaseRowItem?) -> Unit)? = null
@@ -180,6 +184,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
 				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+				updateRecentlyWatchedRow()
 
 				// Wire up Live TV sibling rows so the On Now row removes the buttons row when empty
 				@Suppress("UNCHECKED_CAST")
@@ -217,6 +222,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+				settingsViewModel.visible
+					.onEach { visible -> if (!visible && homeRowsLoaded) updateRecentlyWatchedRow() }
+					.launchIn(this)
+
 				api.webSocket.subscribe<UserDataChangedMessage>()
 					.onEach { refreshRows(force = true, delayed = false) }
 					.launchIn(this)
@@ -239,7 +248,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onResume() {
 		super.onResume()
-		// Home owns a single bounded preview; avoid also loading every full-screen backdrop.
+		// Home shows metadata on a plain background, without loading full-screen backdrops.
 		backgroundService.clearBackgrounds()
 		backgroundService.disable()
 		updateDiscoveryRows()
@@ -274,12 +283,32 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
 		lifecycleScope.launch(Dispatchers.IO) {
 			if (delayed) delay(1.5.seconds)
+			withContext(Dispatchers.Main) { updateRecentlyWatchedRow() }
 
 			repeat(adapter.size()) { i ->
 				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter
 				if (force) rowAdapter?.Retrieve()
 				else rowAdapter?.ReRetrieveIfNeeded()
 			}
+		}
+	}
+
+	@Suppress("UNCHECKED_CAST")
+	private fun updateRecentlyWatchedRow() {
+		val rowsAdapter = adapter as MutableObjectAdapter<Row>
+		if (!userPreferences[UserPreferences.homeRecentlyWatchedEnabled]) {
+			recentlyWatchedRow?.let(rowsAdapter::remove)
+			return
+		}
+		val row = recentlyWatchedRow
+		if (row == null) {
+			helper.loadRecentlyWatched().addToRowsAdapter(requireContext(),
+				CardPresenter(true, ImageType.POSTER, 180, false, homeLayout = true), rowsAdapter)
+			recentlyWatchedRow = rowsAdapter[rowsAdapter.size() - 1] as? ListRow
+		} else if (!rowsAdapter.contains(row)) {
+			// Empty history removes its row. Retain the adapter so the first completed video can restore it.
+			rowsAdapter.add(row)
+			(row.adapter as ItemRowAdapter).Retrieve()
 		}
 	}
 

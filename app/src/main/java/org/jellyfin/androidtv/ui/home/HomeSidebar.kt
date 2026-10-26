@@ -111,6 +111,7 @@ internal fun HomeSidebar(
 		item(key = "libraries-heading") {
 			if (expanded) Text(
 				text = stringResource(R.string.lbl_my_media),
+				color = Color.White,
 				modifier = Modifier.height(44.dp).padding(start = 12.dp, top = 16.dp, bottom = 4.dp),
 			) else Spacer(Modifier.height(44.dp))
 		}

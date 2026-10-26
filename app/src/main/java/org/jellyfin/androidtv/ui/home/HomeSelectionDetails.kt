@@ -1,94 +1,52 @@
 package org.jellyfin.androidtv.ui.home
 
-import android.widget.ImageView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.preference.constant.BackdropBehavior
 import org.jellyfin.androidtv.ui.base.Text
-import org.jellyfin.androidtv.ui.composable.AsyncImage
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
-import org.jellyfin.androidtv.util.apiclient.JellyfinImage
-import org.jellyfin.androidtv.util.apiclient.getUrl
-import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
 
-/** A focus-driven preview using existing row metadata; artwork loads only after focus settles. */
+/** A text-only preview using the selected card's existing metadata. */
 @Composable
 internal fun HomeSelectionDetails(item: BaseRowItem?, previewMaxHeight: Dp) {
 	val context = LocalContext.current
-	val density = LocalDensity.current
-	val api = koinInject<ApiClient>()
 	val preferences = koinInject<UserPreferences>()
-	val cinematic by rememberPreference(preferences, UserPreferences.homeCinematicPreview)
-	val previewHeight = if (cinematic) previewMaxHeight else minOf(previewMaxHeight, 128.dp)
-	val tallPreview = cinematic && previewHeight >= 144.dp
-	val backdropBehavior by rememberPreference(preferences, UserPreferences.backdropBehavior)
+	val detailed by rememberPreference(preferences, UserPreferences.homeCinematicPreview)
+	val previewHeight = if (detailed) previewMaxHeight else minOf(previewMaxHeight, 128.dp)
+	val tallPreview = detailed && previewHeight >= 144.dp
 	val baseItem = item?.baseItem
 	val title = remember(item, context) { item?.getFullName(context) }
 	val summary = remember(item, context) { item?.getSummary(context).orEmpty() }
-	val targetImage = remember(baseItem, cinematic, backdropBehavior) {
-		if (cinematic && backdropBehavior != BackdropBehavior.DISABLED) homePreviewBackdrop(baseItem) else null
-	}
-	var image by remember { mutableStateOf<JellyfinImage?>(null) }
-	LaunchedEffect(targetImage) {
-		image = null
-		if (targetImage != null) {
-			delay(180)
-			image = targetImage
-		}
-	}
 	val background = Color(0xFF10151E)
-	BoxWithConstraints(Modifier.fillMaxWidth().height(previewHeight).background(background)) {
-		if (cinematic) {
-			val url = remember(image, maxWidth, density, api) {
-				image?.getUrl(api, maxWidth = with(density) { (maxWidth * 0.74f).roundToPx() }.coerceAtMost(1280),
-					maxHeight = 720)
-			}
-			AsyncImage(url = url, scaleType = ImageView.ScaleType.CENTER_CROP,
-				modifier = Modifier.fillMaxWidth(0.74f).fillMaxHeight().align(Alignment.CenterEnd))
-			Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(
-				0f to background, 0.3f to background, 0.74f to background.copy(alpha = 0.25f), 1f to Color.Transparent,
-			)))
-			Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
-				0f to background.copy(alpha = 0.15f), 0.65f to Color.Transparent, 1f to background,
-			)))
-		}
+	Box(Modifier.fillMaxWidth().height(previewHeight).clipToBounds().background(background)) {
 		Column(
-			modifier = Modifier.fillMaxWidth(if (cinematic) 0.72f else 1f).align(Alignment.CenterStart)
+			modifier = Modifier.fillMaxWidth().align(Alignment.CenterStart)
 				.padding(start = 48.dp, end = 24.dp, top = 4.dp, bottom = 12.dp),
 			verticalArrangement = Arrangement.spacedBy(7.dp),
 		) {
@@ -114,7 +72,7 @@ internal fun HomeSelectionDetails(item: BaseRowItem?, previewMaxHeight: Dp) {
 						else stringResource(R.string.runtime_minutes, minutes))
 				}
 				baseItem?.officialRating?.takeIf(String::isNotBlank)?.let { PreviewMetadata(it, badge = true) }
-				baseItem?.communityRating?.takeIf { it > 0 && cinematic }?.let {
+				baseItem?.communityRating?.takeIf { it > 0 && detailed }?.let {
 					PreviewMetadata("★ ${String.format(java.util.Locale.getDefault(), "%.1f", it)}")
 				}
 			}

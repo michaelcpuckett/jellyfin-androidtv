@@ -45,6 +45,16 @@ fun SettingsHomeScreen() {
 
 		item { ListSection(headingContent = { Text(stringResource(R.string.home_appearance_discovery)) }) }
 		item {
+			var enabled by rememberPreference(userPreferences, UserPreferences.homeRecentlyWatchedEnabled)
+			ListButton(
+				headingContent = { Text(stringResource(R.string.home_recently_watched)) },
+				captionContent = { Text(stringResource(R.string.home_recently_watched_description)) },
+				trailingContent = { Checkbox(checked = enabled) },
+				onClick = { enabled = !enabled },
+				modifier = Modifier.focusKey("home_recently_watched"),
+			)
+		}
+		item {
 			var enabled by rememberPreference(userPreferences, UserPreferences.homeCinematicPreview)
 			ListButton(
 				headingContent = { Text(stringResource(R.string.home_cinematic_preview)) },

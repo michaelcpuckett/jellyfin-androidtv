@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -151,7 +152,7 @@ fun AppNavigationHost(
 				onFocusChanged = { sidebarExpanded = it },
 				onContentFocus = requestContentFocus,
 				onToolbarFocus = { false },
-				modifier = Modifier.align(Alignment.CenterStart),
+				modifier = Modifier.align(Alignment.CenterStart).zIndex(1f),
 			)
 		}
 	}

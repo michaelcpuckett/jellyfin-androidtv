@@ -52,6 +52,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 
 		val homeCinematicPreview = booleanPreference("home_cinematic_preview", true)
 		val homeDiscoveryEnabled = booleanPreference("home_discovery_enabled", false)
+		val homeRecentlyWatchedEnabled = booleanPreference("home_recently_watched_enabled", true)
 
 		/* Playback - General*/
 		/**
