@@ -285,13 +285,14 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             mGridView.setOnUnhandledKeyListener(event -> {
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP
                         && mGridView.getSelectedPosition() >= 0 && mGridView.getSelectedPosition() < LibraryPosterGrid.COLUMNS) {
-                    return mFilterControl != null && mFilterControl.requestFocus();
+                    return CategoryPlaybackControls.focus(binding.getRoot()) || (mFilterControl != null && mFilterControl.requestFocus());
                 }
                 return false;
             });
         }
         binding.rowsFragment.removeAllViews();
         binding.rowsFragment.addView(mGridViewHolder.view);
+        CategoryPlaybackControls.connectGrid(binding.getRoot(), mGridView);
 
         updateAdapter();
     }
@@ -813,6 +814,8 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private void addTools() {
         if (mPosterGrid) {
             addPosterTools();
+            CategoryPlaybackControls.install(this, mFolder, binding.getRoot(), binding.toolBar, binding.rowsFragment);
+            CategoryPlaybackControls.connectGrid(binding.getRoot(), mGridView);
             return;
         }
         //Add tools
@@ -924,6 +927,8 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
             binding.toolBar.addView(mSettingsButton);
             BrowseGridFragmentHelperKt.addSettings(BrowseGridFragment.this, binding.settings, mFolder.getId(), mFolder.getDisplayPreferencesId(), settingsVisible);
         }
+        CategoryPlaybackControls.install(this, mFolder, binding.getRoot(), binding.toolBar, binding.rowsFragment);
+        CategoryPlaybackControls.connectGrid(binding.getRoot(), mGridView);
     }
 
     private void configurePosterHeader() {
@@ -963,6 +968,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         button.setOnKeyListener((v, keyCode, event) -> {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
             if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                if (CategoryPlaybackControls.focus(binding.getRoot())) return true;
                 if (mAdapter.getItemsLoaded() > 0) mGridView.requestFocus();
                 return true;
             }

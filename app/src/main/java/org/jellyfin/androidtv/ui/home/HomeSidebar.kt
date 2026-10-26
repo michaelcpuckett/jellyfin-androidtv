@@ -120,7 +120,9 @@ internal fun HomeSidebar(
 				label = library.name.orEmpty(),
 				icon = when (library.collectionType) {
 					CollectionType.MOVIES -> R.drawable.ic_movie
-					CollectionType.TVSHOWS, CollectionType.LIVETV -> R.drawable.ic_tv
+					CollectionType.TVSHOWS, CollectionType.LIVETV, CollectionType.MUSICVIDEOS -> R.drawable.ic_tv
+					CollectionType.MUSIC -> R.drawable.ic_select_audio
+					CollectionType.PLAYLISTS -> R.drawable.ic_playlists
 					else -> R.drawable.ic_folder
 				},
 				onClick = { onLibraryClick(library) },
