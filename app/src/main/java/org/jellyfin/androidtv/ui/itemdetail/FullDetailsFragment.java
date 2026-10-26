@@ -557,6 +557,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 ItemRowAdapter similarMoviesAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSimilarItemsRequest(mBaseItem.getId()), QueryType.SimilarMovies, new CardPresenter(), adapter);
                 addItemRow(adapter, similarMoviesAdapter, 5, getString(R.string.lbl_more_like_this));
 
+                EpisodeDetailsSectionsKt.addCommentsSection(this, adapter, mBaseItem);
                 addInfoRows(adapter);
                 break;
             case TRAILER:
@@ -610,20 +611,17 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 ItemRowAdapter similarAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSimilarItemsRequest(mBaseItem.getId()), QueryType.SimilarSeries, new CardPresenter(), adapter);
                 addItemRow(adapter, similarAdapter, 4, getString(R.string.lbl_more_like_this));
+                EpisodeDetailsSectionsKt.addCommentsSection(this, adapter, mBaseItem);
                 break;
 
             case EPISODE:
-                //Additional Parts
-                if (mBaseItem.getPartCount() != null && mBaseItem.getPartCount() > 0) {
-                    ItemRowAdapter additionalPartsAdapter = new ItemRowAdapter(requireContext(), new GetAdditionalPartsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
-                    addItemRow(adapter, additionalPartsAdapter, 0, getString(R.string.lbl_additional_parts));
-                }
-
                 if (mBaseItem.getSeasonId() != null && mBaseItem.getIndexNumber() != null) {
                     // query index is zero-based but episode no is not
                     ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createNextEpisodesRequest(mBaseItem.getSeasonId(), mBaseItem.getIndexNumber()), 0, false, true, new CardPresenter(true, 120), adapter);
-                    addItemRow(adapter, nextAdapter, 5, getString(R.string.lbl_next_episode));
+                    addItemRow(adapter, nextAdapter, 20, getString(R.string.lbl_next_episode));
                 }
+
+                EpisodeDetailsSectionsKt.addEpisodeCast(this, adapter, mBaseItem);
 
                 //Guest stars
                 if (mBaseItem.getPeople() != null && !mBaseItem.getPeople().isEmpty()) {
@@ -633,17 +631,23 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                     }
                     if (!guests.isEmpty()) {
                         ItemRowAdapter castAdapter = new ItemRowAdapter(guests, requireContext(), new CardPresenter(true, 130), adapter);
-                        addItemRow(adapter, castAdapter, 0, getString(R.string.lbl_guest_stars));
+                        addItemRow(adapter, castAdapter, 40, getString(R.string.lbl_guest_stars));
                     }
                 }
+
+                EpisodeDetailsSectionsKt.addCommentsSection(this, adapter, mBaseItem);
 
                 //Chapters
                 if (mBaseItem.getChapters() != null && !mBaseItem.getChapters().isEmpty()) {
                     List<ChapterItemInfo> chapters = BaseItemExtensionsKt.buildChapterItems(mBaseItem);
                     ItemRowAdapter chapterAdapter = new ItemRowAdapter(requireContext(), chapters, new CardPresenter(true, 120), adapter);
-                    addItemRow(adapter, chapterAdapter, 1, getString(R.string.lbl_chapters));
+                    addItemRow(adapter, chapterAdapter, 60, getString(R.string.lbl_chapters));
                 }
 
+                if (mBaseItem.getPartCount() != null && mBaseItem.getPartCount() > 0) {
+                    ItemRowAdapter additionalPartsAdapter = new ItemRowAdapter(requireContext(), new GetAdditionalPartsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                    addItemRow(adapter, additionalPartsAdapter, 70, getString(R.string.lbl_additional_parts));
+                }
                 addInfoRows(adapter);
                 break;
 
@@ -1127,6 +1131,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
     int collapsedOptions = 0;
 
+    boolean isCurrentDetailsAdapter(MutableObjectAdapter<Row> adapter, UUID itemId) {
+        return isAdded() && getView() != null && mRowsAdapter == adapter && mBaseItem.getId().equals(itemId);
+    }
+
     void showMoreButtonIfNeeded() {
         int visibleOptions = mDetailsOverviewRow.getVisibleActions();
 
@@ -1197,6 +1205,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         public void onItemClicked(final Presenter.ViewHolder itemViewHolder, Object item,
                                   RowPresenter.ViewHolder rowViewHolder, Row row) {
 
+            if (item instanceof DiscussionCard) {
+                ((DiscussionCard) item).open();
+                return;
+            }
             if (!(item instanceof BaseRowItem)) return;
             itemLauncher.getValue().launch((BaseRowItem) item, (ItemRowAdapter) ((ListRow) row).getAdapter(), requireContext());
         }

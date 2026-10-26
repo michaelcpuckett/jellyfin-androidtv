@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="episode_comments_title">Comments</string>
+    <string name="episode_details_cast">Cast</string>
+    <string name="episode_comments_browse">View all comments</string>
+    <string name="episode_comments_browse_description">%1$d comments on Trakt · open to sort, read replies and browse more</string>
+    <string name="episode_comments_unavailable">Comments are unavailable on this server.</string>
+    <string name="episode_comments_back">Back to discussion</string>
+    <string name="episode_comments_sort">Sort comments</string>
+    <string name="episode_comments_sort_likes">Most liked</string>
+    <string name="episode_comments_sort_newest">Newest</string>
+    <string name="episode_comments_sort_oldest">Oldest</string>
+    <string name="episode_comments_sort_replies">Most replies</string>
+    <string name="episode_comments_previous">Previous page</string>
+    <string name="episode_comments_next">Next page</string>
+    <string name="episode_comments_attribution">Public discussions from Trakt · spoilers hidden until revealed</string>
+    <string name="episode_comments_loading">Loading discussion…</string>
+    <string name="episode_comments_empty">No comments on this page.</string>
+    <string name="episode_comments_page">Comments · page %1$d of %2$d · %3$d total</string>
+    <string name="episode_comments_replies_page">Replies · page %1$d of %2$d · %3$d total</string>
+    <string name="episode_comments_card">%1$s · %2$d likes · %3$d replies</string>
+    <string name="episode_comments_spoiler">Spoiler hidden. Open this comment and choose Reveal spoiler to read it.</string>
+    <string name="episode_comments_reveal">Reveal spoiler</string>
+    <string name="episode_comments_hide">Hide spoiler</string>
+    <string name="episode_comments_replies">Replies</string>
+    <string name="episode_comments_retry">Retry</string>
+    <string name="episode_comments_detail_title">%1$s · %2$s</string>
+    <string name="episode_comments_auth_error">Sign in again to read comments. Your Jellyfin user must have access to this title.</string>
+    <string name="episode_comments_missing_error">Comments are unavailable. Check that the Episode Comments server plugin is installed and that this title has matching provider IDs.</string>
+    <string name="episode_comments_mapping_error">This episode needs a matching override in the server plugin settings. Combined files and alternate episode orders may need an explicit match.</string>
+    <string name="episode_comments_rate_error">Trakt is receiving too many requests. Wait a little before retrying.</string>
+    <string name="episode_comments_config_error">Ask the server administrator to check the Episode Comments plugin’s Trakt Client ID.</string>
+    <string name="episode_comments_network_error">Could not load comments. Check your connection and try again.</string>
+</resources>
