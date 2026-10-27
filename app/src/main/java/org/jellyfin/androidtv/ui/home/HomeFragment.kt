@@ -47,7 +47,6 @@ import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.ui.browsing.focusNavigationSidebar
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
-import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.koin.android.ext.android.inject
 
 class HomeFragment : Fragment() {
@@ -92,7 +91,7 @@ class HomeFragment : Fragment() {
 						.onPreviewKeyEvent { it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown && requestContentFocus() }
 						.focusGroup()
 				) {
-					MainToolbar(MainToolbarActiveButton.Home)
+					MainToolbar()
 				}
 				HomeSelectionDetails(selectedItem, previewMaxHeight)
 				AndroidFragment<HomeRowsFragment>(
