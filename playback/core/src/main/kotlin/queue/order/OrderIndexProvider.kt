@@ -33,4 +33,7 @@ internal interface OrderIndexProvider {
 	 * modify internal state for the provider.
 	 */
 	fun useNextIndex() = Unit
+
+	/** Consume the planned order through [index], returning the entries skipped before it. */
+	fun consumeThrough(index: Int): Collection<Int> = emptyList()
 }

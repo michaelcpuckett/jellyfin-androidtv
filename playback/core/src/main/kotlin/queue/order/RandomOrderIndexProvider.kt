@@ -30,4 +30,15 @@ internal class RandomOrderIndexProvider : OrderIndexProvider {
 	override fun useNextIndex() {
 		nextIndices.removeAt(0)
 	}
+
+	override fun consumeThrough(index: Int): Collection<Int> {
+		val position = nextIndices.indexOf(index)
+		if (position < 0) {
+			nextIndices.clear()
+			return emptyList()
+		}
+		val skipped = nextIndices.take(position)
+		nextIndices.subList(0, position + 1).clear()
+		return skipped
+	}
 }

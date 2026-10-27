@@ -241,6 +241,9 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
         primaryActionsAdapter.add(playPauseAction);
         VideoPlayerAdapter playerAdapter = getPlayerAdapter();
 
+        if (playerAdapter.hasPreviousItem()) primaryActionsAdapter.add(skipPreviousAction);
+        if (playerAdapter.hasNextItem()) primaryActionsAdapter.add(skipNextAction);
+
         if (playerAdapter.canSeek()) {
             primaryActionsAdapter.add(rewindAction);
             primaryActionsAdapter.add(fastForwardAction);
@@ -266,14 +269,6 @@ public class CustomPlaybackTransportControlGlue extends PlaybackTransportControl
                 secondaryActionsAdapter.add(recordAction);
                 recordingStateChanged();
             }
-        }
-
-        if (playerAdapter.hasPreviousItem()) {
-            secondaryActionsAdapter.add(skipPreviousAction);
-        }
-
-        if (playerAdapter.hasNextItem()) {
-            secondaryActionsAdapter.add(skipNextAction);
         }
 
         if (playerAdapter.hasChapters()) {

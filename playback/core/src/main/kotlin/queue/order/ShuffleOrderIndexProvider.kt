@@ -1,7 +1,5 @@
 package org.jellyfin.playback.core.queue.order
 
-import kotlin.math.min
-
 internal class ShuffleOrderIndexProvider : OrderIndexProvider {
 	private val nextIndices = mutableListOf<Int>()
 
@@ -13,24 +11,15 @@ internal class ShuffleOrderIndexProvider : OrderIndexProvider {
 		playedIndices: Collection<Int>,
 		currentIndex: Int,
 	): Collection<Int> {
-		val remainingItemsSize = size - playedIndices.size
-		return if (remainingItemsSize <= 0) {
-			emptyList()
-		} else {
-			val remainingIndices = (0..size).filterNot {
-				it in playedIndices || it in nextIndices
-			}
-
-			List(min(amount, remainingItemsSize)) { i ->
-				if (i < nextIndices.lastIndex) {
-					nextIndices[i]
-				} else {
-					val index = remainingIndices.random()
-					nextIndices.add(index)
-					index
-				}
-			}
+		if (amount <= 0 || size <= 0) return emptyList()
+		val excluded = playedIndices.toSet() + currentIndex
+		nextIndices.removeAll { it !in 0 until size || it in excluded }
+		val needed = (amount - nextIndices.size).coerceAtLeast(0)
+		if (needed > 0) {
+			val planned = nextIndices.toSet()
+			nextIndices.addAll((0 until size).filterNot { it in excluded || it in planned }.shuffled().take(needed))
 		}
+		return nextIndices.take(amount)
 	}
 
 	override fun notifyRemoved(index: Int) {
@@ -39,6 +28,17 @@ internal class ShuffleOrderIndexProvider : OrderIndexProvider {
 	}
 
 	override fun useNextIndex() {
-		nextIndices.removeAt(0)
+		nextIndices.removeFirstOrNull()
+	}
+
+	override fun consumeThrough(index: Int): Collection<Int> {
+		val position = nextIndices.indexOf(index)
+		if (position < 0) {
+			nextIndices.clear()
+			return emptyList()
+		}
+		val skipped = nextIndices.take(position)
+		nextIndices.subList(0, position + 1).clear()
+		return skipped
 	}
 }

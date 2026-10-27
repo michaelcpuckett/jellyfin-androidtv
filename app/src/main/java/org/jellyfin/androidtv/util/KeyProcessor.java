@@ -181,7 +181,7 @@ public class KeyProcessor {
         int order = 0;
 
         if (rowItem instanceof AudioQueueBaseRowItem) {
-            if (rowItem.getBaseItem() != mediaManager.getValue().getCurrentAudioItem())
+            if (!((AudioQueueBaseRowItem) rowItem).getPlaying())
                 menu.getMenu().add(0, MENU_ADVANCE_QUEUE, order++, R.string.lbl_play_from_here);
             menu.getMenu().add(0, MENU_GOTO_NOW_PLAYING, order++, R.string.lbl_goto_now_playing);
 

@@ -168,8 +168,9 @@ class RewriteMediaManager(
 	}
 
 	override fun playFrom(entry: QueueEntry): Boolean {
-		val index = playbackManager.queue.indexOf(entry) ?: return false
-		return runBlocking { playbackManager.queue.setIndex(index) != null }
+		val selected = runBlocking { playbackManager.queue.playFrom(entry) } ?: return false
+		playbackManager.state.play()
+		return selected === entry
 	}
 
 	override fun shuffleAudioQueue() {
