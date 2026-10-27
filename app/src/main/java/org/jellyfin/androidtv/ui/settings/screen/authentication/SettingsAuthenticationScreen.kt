@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.settings.screen.authentication
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.ServerUserRepository
+import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.store.AuthenticationPreferences
 import org.jellyfin.androidtv.preference.constant.UserSelectBehavior
 import org.jellyfin.androidtv.ui.base.Icon
@@ -20,8 +22,10 @@ import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.form.Checkbox
 import org.jellyfin.androidtv.ui.base.list.ListButton
 import org.jellyfin.androidtv.ui.base.list.ListSection
+import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
 import org.jellyfin.androidtv.ui.navigation.focus.focusKey
+import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
@@ -34,6 +38,9 @@ fun SettingsAuthenticationScreen(launchedFromLogin: Boolean = false) {
 	val serverRepository = koinInject<ServerRepository>()
 	val serverUserRepository = koinInject<ServerUserRepository>()
 	val authenticationPreferences = koinInject<AuthenticationPreferences>()
+	val sessionRepository = koinInject<SessionRepository>()
+	val mediaManager = koinInject<MediaManager>()
+	val activity = LocalActivity.current
 
 	LaunchedEffect(serverRepository) { serverRepository.loadStoredServers() }
 
@@ -49,6 +56,22 @@ fun SettingsAuthenticationScreen(launchedFromLogin: Boolean = false) {
 			ListSection(
 				overlineContent = { Text(stringResource(R.string.settings).uppercase()) },
 				headingContent = { Text(stringResource(R.string.pref_login)) },
+			)
+		}
+
+		if (!launchedFromLogin) item {
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_users), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.lbl_switch_user)) },
+				onClick = {
+					if (activity != null) {
+						mediaManager.clearAudioQueue()
+						sessionRepository.destroyCurrentSession()
+						activity.startActivity(ActivityDestinations.startup(activity))
+						activity.finishAfterTransition()
+					}
+				},
+				modifier = Modifier.focusKey("switch_account"),
 			)
 		}
 
