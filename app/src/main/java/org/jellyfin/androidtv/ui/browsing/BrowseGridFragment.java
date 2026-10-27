@@ -17,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.PopupMenu;
 import android.widget.PopupWindow;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,6 +54,7 @@ import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter;
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapterHelperKt;
+import org.jellyfin.androidtv.ui.itemhandling.LibraryGridPager;
 import org.jellyfin.androidtv.ui.presentation.CardPresenter;
 import org.jellyfin.androidtv.ui.presentation.HorizontalGridPresenter;
 import org.jellyfin.androidtv.util.CoroutineUtils;
@@ -103,6 +105,11 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
     private Button mSortControl;
     private Button mOrderControl;
     private boolean mInitialGridFocus = true;
+    private LibraryGridPager mGridPager;
+    private LibraryAlphabetRail mAlphabetRail;
+    private int mRestorePosition = -1;
+    private Character mAlphabetFilter;
+    private boolean mAlphabetExitPending;
 
     private UUID mParentId;
     private BaseItemDto mFolder;
@@ -253,6 +260,11 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
     @Override
     public void onDestroyView() {
+        if (mPosterGrid) {
+            if (mAdapter != null && mSelectedPosition >= 0) mRestorePosition = mSelectedPosition + mAdapter.getGridStartIndex();
+            // The pager belongs to the view lifecycle; re-create it when returning from details.
+            mDirty = true;
+        }
         super.onDestroyView();
 
         binding = null;
@@ -260,6 +272,14 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         mFilterControl = null;
         mSortControl = null;
         mOrderControl = null;
+        mGridPager = null;
+        mAlphabetRail = null;
+        mAlphabetExitPending = false;
+        if (mPosterGrid) {
+            mAdapter = null;
+            mCardPresenter = null;
+            mCurrentItem = null;
+        }
     }
 
     private void createGrid() {
@@ -281,7 +301,33 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         mGridView.setVerticalSpacing(mPosterGrid ? Utils.convertDpToPixel(requireContext(), mGridItemSpacingVertical) : mGridItemSpacingVertical);
         mGridView.setFocusable(true);
         if (mPosterGrid) {
-            mGridView.setFocusScrollStrategy(BaseGridView.FOCUS_SCROLL_ITEM);
+            // Programmatic selection must also lay out and scroll off-screen rows. ITEM only
+            // scrolls an existing child; after filtering it can advance the counter without moving tiles.
+            mGridView.setFocusScrollStrategy(BaseGridView.FOCUS_SCROLL_ALIGNED);
+            mGridView.setOnKeyInterceptListener(event -> {
+                int endKey = mGridView.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
+                if (event.getAction() == KeyEvent.ACTION_DOWN && mAdapter != null
+                        && (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP || event.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN)) {
+                    int position = mGridView.getSelectedPosition();
+                    boolean up = event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP;
+                    mAdapter.loadMoreItemsIfNeeded(position);
+                    Integer target = LibraryAlphabetKt.verticalLibraryPosition(position, mAdapter.size(), LibraryPosterGrid.COLUMNS, up);
+                    if (target != null) {
+                        // Select off-screen posters explicitly; spatial focus search can choose the alphabet instead.
+                        LibraryGridFocus.move(mGridView, target);
+                    } else if (up && mAdapter.getGridStartIndex() == 0) {
+                        if (!CategoryPlaybackControls.focus(binding.getRoot()) && mFilterControl != null) mFilterControl.requestFocus();
+                    }
+                    // At an unloaded edge, keep focus here until its adjacent page arrives.
+                    return true;
+                }
+                if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == endKey
+                        && mAlphabetRail != null && mAlphabetRail.getVisibility() == View.VISIBLE
+                        && LibraryAlphabetKt.isAlphabetEdge(mGridView.getSelectedPosition(), mAdapter == null ? 0 : mAdapter.size(), LibraryPosterGrid.COLUMNS)) {
+                    return mAlphabetRail.focusLetter();
+                }
+                return false;
+            });
             mGridView.setOnUnhandledKeyListener(event -> {
                 if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP
                         && mGridView.getSelectedPosition() >= 0 && mGridView.getSelectedPosition() < LibraryPosterGrid.COLUMNS) {
@@ -372,7 +418,9 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
     public void setStatusText(String folderName) {
         if (mPosterGrid) {
-            binding.statusText.setText(mAdapter.getTotalItems() == 0 ? getString(R.string.library_grid_empty) : "");
+            binding.statusText.setText(mAdapter.getTotalItems() == 0
+                    ? (mAlphabetFilter == null ? getString(R.string.library_grid_empty) : getString(R.string.library_alphabet_empty, mAlphabetFilter.toString()))
+                    : (mAlphabetFilter == null ? "" : getString(R.string.library_alphabet_active, mAlphabetFilter.toString())));
             updatePosterControls();
             return;
         }
@@ -414,7 +462,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
 
     public void updateCounter(int position) {
         if (mAdapter != null) {
-            binding.counter.setText(MessageFormat.format("{0} | {1}", position, mAdapter.getTotalItems()));
+            binding.counter.setText(MessageFormat.format("{0} | {1}", position > 0 ? position + mAdapter.getGridStartIndex() : 0, mAdapter.getTotalItems()));
         }
     }
 
@@ -766,7 +814,7 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                 if (mLetterButton != null) mLetterButton.setVisibility(ItemSortBy.SORT_NAME.equals(mAdapter.getSortBy()) ? View.VISIBLE : View.GONE);
                 if (mAdapter.getItemsLoaded() == 0) {
                     mGridView.setFocusable(false);
-                    if (mPosterGrid && mFilterControl != null && !binding.toolBar.hasFocus()) mFilterControl.requestFocus();
+                    if (mPosterGrid && mFilterControl != null && !binding.toolBar.hasFocus() && (mAlphabetRail == null || !mAlphabetRail.hasFocus())) mFilterControl.requestFocus();
                     mHandler.postDelayed(() -> {
                         if (!getLifecycle().getCurrentState().isAtLeast(Lifecycle.State.STARTED))
                             return;
@@ -775,12 +823,37 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                     }, 500);
                 } else if (mGridView != null) {
                     mGridView.setFocusable(true);
-                    if (!mPosterGrid || mInitialGridFocus) mGridView.requestFocus();
+                    if ((!mPosterGrid || mInitialGridFocus) && (mAlphabetRail == null || !mAlphabetRail.hasFocus())) mGridView.requestFocus();
                 }
                 if (mPosterGrid) mInitialGridFocus = false;
             }
         });
         mAdapter.setFilters(filters);
+
+        if (mPosterGrid) {
+            mGridPager = new LibraryGridPager(mAdapter, api.getValue(), getViewLifecycleOwner(), chunkSize, mRestorePosition >= 0 ? mRestorePosition : mSelectedPosition, getString(R.string.byletter_letters), mAlphabetFilter,
+                    () -> mGridView == null ? 0 : mGridView.getSelectedPosition(),
+                    position -> {
+                        if (binding != null && mGridView != null) {
+                            setStatusText(mainTitle);
+                            mSelectedPosition = position;
+                            mGridView.setSelectedPosition(position);
+                            updateCounter(mAdapter.size() == 0 ? 0 : position + 1);
+                            if (mAlphabetExitPending) focusPosterResultsNow();
+                        }
+                        return kotlin.Unit.INSTANCE;
+                    },
+                    () -> {
+                        if (binding != null) {
+                            mAlphabetExitPending = false;
+                            binding.statusText.setText(getString(R.string.library_alphabet_failed));
+                            Toast.makeText(requireContext(), R.string.library_alphabet_failed, Toast.LENGTH_SHORT).show();
+                        }
+                        return kotlin.Unit.INSTANCE;
+                    });
+            mAdapter.setGridPaging(mGridPager);
+            mRestorePosition = -1;
+        }
 
         updateAdapter();
     }
@@ -953,6 +1026,34 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         grid.addRule(RelativeLayout.BELOW, binding.toolBar.getId());
         grid.topMargin = Utils.convertDpToPixel(requireContext(), 12);
         binding.rowsFragment.setLayoutParams(grid);
+
+        mAlphabetRail = new LibraryAlphabetRail(requireContext(), getString(R.string.byletter_letters),
+                letter -> {
+                    if (mGridPager != null) {
+                        mAlphabetFilter = letter;
+                        mAlphabetExitPending = false;
+                        mSelectedPosition = 0;
+                        mCurrentItem = null;
+                        mAlphabetRail.selectLetter(letter);
+                        binding.statusText.setText(getString(R.string.library_alphabet_loading, letter == null ? getString(R.string.lbl_all_items) : letter.toString()));
+                        mGridPager.filter(letter);
+                    }
+                    return kotlin.Unit.INSTANCE;
+                },
+                () -> {
+                    mAlphabetExitPending = true;
+                    if (mGridPager == null || !mGridPager.isLoading()) focusPosterResultsNow();
+                    return kotlin.Unit.INSTANCE;
+                });
+        mAlphabetRail.selectLetter(mAlphabetFilter);
+        RelativeLayout.LayoutParams rail = new RelativeLayout.LayoutParams(Utils.convertDpToPixel(requireContext(), 32), ViewGroup.LayoutParams.MATCH_PARENT);
+        rail.addRule(RelativeLayout.ALIGN_TOP, binding.rowsFragment.getId());
+        rail.addRule(RelativeLayout.ALIGN_BOTTOM, binding.rowsFragment.getId());
+        rail.addRule(RelativeLayout.ALIGN_PARENT_END);
+        rail.setMarginEnd(Utils.convertDpToPixel(requireContext(), 10));
+        binding.getRoot().addView(mAlphabetRail, binding.getRoot().indexOfChild(binding.settings), rail);
+        grid.addRule(RelativeLayout.START_OF, mAlphabetRail.getId());
+        binding.rowsFragment.setLayoutParams(grid);
     }
 
     private Button posterControl() {
@@ -973,9 +1074,20 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
                 return true;
             }
             int startKey = v.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? KeyEvent.KEYCODE_DPAD_RIGHT : KeyEvent.KEYCODE_DPAD_LEFT;
+            int endKey = v.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL ? KeyEvent.KEYCODE_DPAD_LEFT : KeyEvent.KEYCODE_DPAD_RIGHT;
+            if (v == mOrderControl && keyCode == endKey && mAlphabetRail != null) return mAlphabetRail.focusLetter();
             return v == mFilterControl && keyCode == startKey && DestinationFragmentViewKt.focusNavigationSidebar(v);
         });
         return button;
+    }
+
+    private void focusPosterResultsNow() {
+        mAlphabetExitPending = false;
+        if (binding == null || mGridView == null || mAdapter == null) return;
+        if (!mGridView.hasFocus() && (mAlphabetRail == null || !mAlphabetRail.hasFocus())) return;
+        boolean focused = LibraryGridFocus.focus(mGridView, mAdapter.size(),
+                () -> binding != null && mGridView != null && (mGridView.hasFocus() || (mAlphabetRail != null && mAlphabetRail.hasFocus())));
+        if (!focused && mFilterControl != null) mFilterControl.requestFocus();
     }
 
     private void addPosterTools() {
@@ -1101,11 +1213,20 @@ public class BrowseGridFragment extends Fragment implements View.OnKeyListener {
         if (mCurrentItem == null) return;
         Timber.i("Refresh item \"%s\"", mCurrentItem.getFullName(requireContext()));
         ItemRowAdapterHelperKt.refreshItem(mAdapter, api.getValue(), this, mCurrentItem, () -> {
+            if (binding == null || mAdapter == null || mCurrentItem == null) return null;
+            if (mPosterGrid && mAdapter.indexOf(mCurrentItem) == -1) {
+                retrievePosterGrid();
+                return null;
+            }
             //Now - if filtered make sure we still pass
             if (mAdapter.getFilters() == null) return null;
             if ((mAdapter.getFilters().isFavoriteOnly() && !mCurrentItem.isFavorite()) || (mAdapter.getFilters().isUnwatchedOnly() && mCurrentItem.isPlayed())) {
                 // if we are about to remove the current item, throw focus to toolbar so framework doesn't crash
                 binding.toolBar.requestFocus();
+                if (mPosterGrid) {
+                    retrievePosterGrid();
+                    return null;
+                }
                 mAdapter.remove(mCurrentItem);
                 mAdapter.setTotalItems(mAdapter.getTotalItems() - 1);
                 updateCounter(mAdapter.indexOf(mCurrentItem));

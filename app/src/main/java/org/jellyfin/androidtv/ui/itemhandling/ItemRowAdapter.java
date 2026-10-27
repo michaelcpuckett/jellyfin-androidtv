@@ -57,6 +57,21 @@ import kotlin.Lazy;
 import timber.log.Timber;
 
 public class ItemRowAdapter extends MutableObjectAdapter<Object> {
+    /** Optional bidirectional paging for standalone category grids. Rows retain their existing pager. */
+    public interface GridPaging {
+        void retrieve();
+        void loadMore(int position);
+        int getStartIndex();
+    }
+
+    private GridPaging gridPaging;
+
+    public void setGridPaging(GridPaging paging) { gridPaging = paging; }
+    public int getGridStartIndex() { return gridPaging == null ? 0 : gridPaging.getStartIndex(); }
+    public GetItemsRequest getItemsQuery() { return mQuery; }
+    public GetArtistsRequest getArtistsQuery() { return mArtistsQuery; }
+    public GetAlbumArtistsRequest getAlbumArtistsQuery() { return mAlbumArtistsQuery; }
+
     private GetItemsRequest mQuery;
     private GetNextUpRequest mNextUpQuery;
     private GetSeasonsRequest mSeasonQuery;
@@ -472,6 +487,10 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     public void loadMoreItemsIfNeeded(int pos) {
+        if (gridPaging != null) {
+            gridPaging.loadMore(pos);
+            return;
+        }
         if (fullyLoaded) {
             //context.getLogger().Debug("Row is fully loaded");
             return;
@@ -570,6 +589,11 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     public void Retrieve() {
+        if (gridPaging != null) {
+            lastFullRetrieve = Instant.now();
+            gridPaging.retrieve();
+            return;
+        }
         notifyRetrieveStarted();
         lastFullRetrieve = Instant.now();
         itemsLoaded = 0;

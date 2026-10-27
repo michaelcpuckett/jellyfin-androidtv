@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_alphabet_all">All</string>
+    <string name="library_alphabet_jump">Filter by %1$s</string>
+    <string name="library_alphabet_loading">Loading %1$s…</string>
+    <string name="library_alphabet_active">Starting with %1$s</string>
+    <string name="library_alphabet_empty">No titles under %1$s</string>
+    <string name="library_alphabet_failed">Could not load this part of the library. Please try again.</string>
+</resources>
