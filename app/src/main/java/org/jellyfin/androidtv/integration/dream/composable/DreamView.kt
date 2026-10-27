@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import org.jellyfin.androidtv.integration.dream.model.DreamContent
+import org.jellyfin.sdk.model.api.BaseItemDto
 
 @Composable
 fun DreamView(
 	content: DreamContent,
 	showClock: Boolean,
+	nowPlaying: BaseItemDto? = null,
 ) = Box(
 	modifier = Modifier
 		.fillMaxSize()
@@ -37,5 +39,6 @@ fun DreamView(
 	// Header overlay
 	DreamHeader(
 		showClock = showClock,
+		nowPlaying = nowPlaying,
 	)
 }

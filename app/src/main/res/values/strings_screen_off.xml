@@ -1,0 +1,4 @@
+<resources>
+    <string name="screen_off">Screen off</string>
+    <string name="screen_off_description">Screen off. Press Back or a navigation button to return.</string>
+</resources>
