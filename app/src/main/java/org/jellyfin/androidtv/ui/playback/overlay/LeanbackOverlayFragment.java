@@ -24,6 +24,7 @@ import timber.log.Timber;
 public class LeanbackOverlayFragment extends PlaybackSupportFragment {
     private CustomPlaybackTransportControlGlue playerGlue;
     private VideoPlayerAdapter playerAdapter;
+    private VideoQueueRow videoQueueRow;
     private boolean shouldShowOverlay = true;
     private Lazy<PlaybackControllerContainer> playbackControllerContainer = inject(PlaybackControllerContainer.class);
     private final Lazy<UserSettingPreferences> userSettingPreferences = inject(UserSettingPreferences.class);
@@ -51,6 +52,12 @@ public class LeanbackOverlayFragment extends PlaybackSupportFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // PlaybackSupportFragment creates its adapter in onCreateView, after onCreate.
+        if (videoQueueRow == null && playerAdapter != null) {
+            PlaybackController controller = playbackControllerContainer.getValue().getPlaybackController();
+            if (controller != null) videoQueueRow = new VideoQueueRow(this, controller);
+        }
 
         super.hideControlsOverlay(false);
     }
@@ -82,6 +89,10 @@ public class LeanbackOverlayFragment extends PlaybackSupportFragment {
     public void updatePlayState() {
         playerAdapter.updatePlayState();
         playerGlue.updatePlayState();
+        if (videoQueueRow != null && videoQueueRow.isBrowsing()) {
+            setControlsOverlayAutoHideEnabled(false);
+            setFading(false);
+        }
     }
 
     public void setShouldShowOverlay(boolean shouldShowOverlay) {
@@ -111,6 +122,7 @@ public class LeanbackOverlayFragment extends PlaybackSupportFragment {
         if (currentlyPlayingItem == null) return;
 
         playerGlue.invalidatePlaybackControls();
+        if (videoQueueRow != null) videoQueueRow.update();
         playerGlue.setSeekEnabled(playerAdapter.canSeek());
 
         long skipForwardLength = userSettingPreferences.getValue().get(UserSettingPreferences.Companion.getSkipForwardLength()).longValue();

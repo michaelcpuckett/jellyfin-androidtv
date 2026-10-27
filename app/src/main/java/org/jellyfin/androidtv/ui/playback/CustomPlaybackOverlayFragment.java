@@ -138,6 +138,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
     private final PlaybackOverlayFragmentHelper helper = new PlaybackOverlayFragmentHelper(this);
     private RegularPlaybackInfoOverlay playbackInfoOverlay;
+    private RegularVideoMediaSession videoMediaSession;
 
     public void togglePlaybackInfo() {
         if (playbackInfoOverlay != null) playbackInfoOverlay.toggle();
@@ -229,11 +230,13 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
         if (playbackController != null) {
             playbackController.init(new VideoManager(requireActivity(), view, helper), this);
+            videoMediaSession = new RegularVideoMediaSession(requireContext(), playbackController.mVideoManager.mExoPlayer, playbackController);
         }
     }
 
     @Override
     public void onDestroyView() {
+        releaseVideoMediaSession();
         if (playbackInfoOverlay != null) playbackInfoOverlay.pause();
         playbackInfoOverlay = null;
         super.onDestroyView();
@@ -719,6 +722,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     @Override
     public void onStop() {
         super.onStop();
+        releaseVideoMediaSession();
         Timber.i("Stopping!");
 
         if (leanbackOverlayFragment != null)
@@ -1337,6 +1341,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         } else {
             navigationRepository.getValue().reset(Destinations.INSTANCE.getHome());
         }
+    }
+
+    private void releaseVideoMediaSession() {
+        if (videoMediaSession != null) videoMediaSession.release();
+        videoMediaSession = null;
     }
 
     public void showNextUp(@NonNull UUID id) {

@@ -29,6 +29,7 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	private var defaultOrderIndexProvider = DefaultOrderIndexProvider()
 	private var orderIndexProvider: OrderIndexProvider = defaultOrderIndexProvider
 	private var currentQueueIndicesPlayed = mutableListOf<Int>()
+	private val skippedIndices = mutableSetOf<Int>()
 
 	override val estimatedSize get() = max(fetchedEntries.size, suppliers.sumOf { it.size } - removedEntries)
 
@@ -120,6 +121,9 @@ class QueueService internal constructor() : PlayerService(), Queue {
 		// Update indices
 		currentQueueIndicesPlayed.removeAll { it == index }
 		currentQueueIndicesPlayed.replaceAll { if (it > index) it - 1 else it }
+		val remainingSkipped = skippedIndices.filterNot { it == index }.map { if (it > index) it - 1 else it }
+		skippedIndices.clear()
+		skippedIndices.addAll(remainingSkipped)
 		if (_entryIndex.value >= index) _entryIndex.value -= 1
 
 		orderIndexProvider.notifyRemoved(index)
@@ -140,6 +144,8 @@ class QueueService internal constructor() : PlayerService(), Queue {
 		_entry.value = null
 		_entryIndex.value = Queue.INDEX_NONE
 		currentQueueIndicesPlayed.clear()
+		skippedIndices.clear()
+		orderIndexProvider.reset()
 	}
 
 	// Preloading
@@ -149,11 +155,11 @@ class QueueService internal constructor() : PlayerService(), Queue {
 		val repeatMode = if (useRepeatMode) state.repeatMode.value else RepeatMode.NONE
 
 		return when (repeatMode) {
-			RepeatMode.NONE -> provider.provideIndices(amount, estimatedSize, currentQueueIndicesPlayed, _entryIndex.value)
+			RepeatMode.NONE -> provider.provideIndices(amount, estimatedSize, currentQueueIndicesPlayed + skippedIndices, _entryIndex.value)
 
 			RepeatMode.REPEAT_ENTRY_ONCE -> buildList(amount) {
 				add(_entryIndex.value)
-				addAll(provider.provideIndices(amount - 1, estimatedSize, currentQueueIndicesPlayed, _entryIndex.value))
+				addAll(provider.provideIndices(amount - 1, estimatedSize, currentQueueIndicesPlayed + skippedIndices, _entryIndex.value))
 			}.take(amount)
 
 			RepeatMode.REPEAT_ENTRY_INFINITE -> List(amount) { _entryIndex.value }
@@ -161,6 +167,16 @@ class QueueService internal constructor() : PlayerService(), Queue {
 	}
 
 	// Jumping
+
+	override suspend fun playFrom(entry: QueueEntry): QueueEntry? {
+		val index = indexOf(entry) ?: return null
+		if (index == _entryIndex.value) return _entry.value
+		skippedIndices.addAll(orderIndexProvider.consumeThrough(index))
+		if (state.playbackOrder.value == PlaybackOrder.DEFAULT && index > _entryIndex.value) {
+			skippedIndices.addAll((_entryIndex.value + 1) until index)
+		}
+		return setIndex(index, saveHistory = true)
+	}
 
 	override suspend fun previous(): QueueEntry? = currentQueueIndicesPlayed.removeLastOrNull()?.let {
 		setIndex(it)

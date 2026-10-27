@@ -248,6 +248,14 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         return mItems != null && mCurrentIndex - 1 >= 0;
     }
 
+    public List<BaseItemDto> getQueueItems() {
+        return mItems == null ? java.util.Collections.emptyList() : java.util.Collections.unmodifiableList(mItems);
+    }
+
+    public int getQueueIndex() {
+        return mCurrentIndex;
+    }
+
     public boolean isPlaying() {
         // since playbackController is so closely tied to videoManager, check if it is playing too since they can fall out of sync
         return mPlaybackState == PlaybackState.PLAYING && hasInitializedVideoManager() && mVideoManager.isPlaying();
@@ -927,24 +935,18 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public void next() {
-        Timber.d("Next called.");
-        if (mCurrentIndex < mItems.size() - 1) {
-            stop();
-            resetPlayerErrors();
-            mCurrentIndex++;
-            videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
-            Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
-            spinnerOff = false;
-            play(0);
-        }
+        playQueueItem(mCurrentIndex + 1);
     }
 
     public void prev() {
-        Timber.d("Prev called.");
-        if (mCurrentIndex > 0 && mItems.size() > 0) {
+        playQueueItem(mCurrentIndex - 1);
+    }
+
+    public void playQueueItem(int index) {
+        if (mFragment != null && mItems != null && index >= 0 && index < mItems.size() && index != mCurrentIndex) {
             stop();
             resetPlayerErrors();
-            mCurrentIndex--;
+            mCurrentIndex = index;
             videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
             Timber.i("Moving to index: %d out of %d total items.", mCurrentIndex, mItems.size());
             spinnerOff = false;

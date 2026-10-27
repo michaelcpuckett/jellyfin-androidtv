@@ -65,6 +65,9 @@ interface Queue {
 	 */
 	suspend fun setIndex(index: Int, saveHistory: Boolean = false): QueueEntry?
 
+	/** Play an existing entry, skipping the entries before it in the current upcoming order. */
+	suspend fun playFrom(entry: QueueEntry): QueueEntry?
+
 	/**
 	 * Find the index of a given entry.
 	 *

@@ -44,7 +44,7 @@ class AudioQueueBaseRowAdapter(
 		// Update item row
 		replaceAll(
 			items,
-			areItemsTheSame = { old, new -> old.baseItem?.id == new.baseItem?.id },
+			areItemsTheSame = { old, new -> old.queueEntry === new.queueEntry },
 			// The equals functions for BaseRowItem only compare by id
 			areContentsTheSame = { _, _ -> false },
 		)
