@@ -211,7 +211,9 @@ class DestinationFragmentView @JvmOverloads constructor(
 		transaction.apply {
 			// Set options
 			setReorderingAllowed(true)
-			setCustomAnimations(R.anim.fade_in, R.anim.fade_out, R.anim.fade_in, R.anim.fade_out)
+			// Switch immediately: the browsing rail changes the content width on detail pages.
+			// Animating the old and new layouts together makes that resize look like a slide.
+			setCustomAnimations(0, 0, 0, 0)
 
 			// Detach current fragment
 			fragmentManager.findFragmentByTag(FRAGMENT_TAG_CONTENT)?.let(::detach)

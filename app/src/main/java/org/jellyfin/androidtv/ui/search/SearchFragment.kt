@@ -22,17 +22,24 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.compose.AndroidFragment
 import androidx.fragment.compose.content
 import androidx.leanback.app.RowsSupportFragment
 import androidx.lifecycle.Lifecycle
+import org.jellyfin.androidtv.ui.browsing.focusNavigationSidebar
 import org.jellyfin.androidtv.ui.search.composable.SearchTextInput
 import org.jellyfin.androidtv.ui.search.composable.SearchVoiceInput
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
-import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
 import org.jellyfin.androidtv.util.speech.rememberSpeechRecognizerAvailability
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -54,6 +61,9 @@ class SearchFragment : Fragment() {
 		val textInputFocusRequester = remember { FocusRequester() }
 		val resultFocusRequester = remember { FocusRequester() }
 		val speechRecognizerAvailability = rememberSpeechRecognizerAvailability()
+		val sidebarDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) FocusDirection.Right else FocusDirection.Left
+		val sidebarKey = if (LocalLayoutDirection.current == LayoutDirection.Rtl) Key.DirectionRight else Key.DirectionLeft
+		val requestSidebarFocus = { view?.focusNavigationSidebar() ?: false }
 
 		LaunchedEffect(Unit) {
 			val extraQuery = arguments?.getString(EXTRA_QUERY)
@@ -71,18 +81,28 @@ class SearchFragment : Fragment() {
 		}
 
 		Column {
-			MainToolbar(MainToolbarActiveButton.Search)
+			MainToolbar()
 
 			Row(
 				horizontalArrangement = Arrangement.spacedBy(12.dp),
 				verticalAlignment = Alignment.CenterVertically,
 				modifier = Modifier
+					.focusProperties {
+						onExit = {
+							// Also cover devices where voice input is unavailable or disabled.
+							if (requestedFocusDirection == sidebarDirection && requestSidebarFocus()) cancelFocusChange()
+						}
+					}
 					.focusRestorer()
 					.focusGroup()
 					.padding(horizontal = 48.dp)
 			) {
 				if (speechRecognizerAvailability) {
 					SearchVoiceInput(
+						modifier = Modifier.onPreviewKeyEvent {
+							// Cross the nested Compose/native boundary explicitly, as the poster grids do.
+							it.type == KeyEventType.KeyDown && it.key == sidebarKey && requestSidebarFocus()
+						},
 						onQueryChange = { query = query.copy(text = it) },
 						onQuerySubmit = {
 							viewModel.searchImmediately(query.text)

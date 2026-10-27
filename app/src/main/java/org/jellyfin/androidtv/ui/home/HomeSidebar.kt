@@ -1,7 +1,9 @@
 package org.jellyfin.androidtv.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
@@ -48,6 +51,7 @@ import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.CollectionType
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun HomeSidebar(
 	libraries: List<BaseItemDto>,
@@ -55,6 +59,8 @@ internal fun HomeSidebar(
 	onRetry: () -> Unit,
 	onLibraryClick: (BaseItemDto) -> Unit,
 	onHomeClick: () -> Unit,
+	onSearchClick: () -> Unit,
+	searchSelected: Boolean,
 	selectedLibraryId: UUID?,
 	expanded: Boolean,
 	focusRequest: Int,
@@ -67,76 +73,96 @@ internal fun HomeSidebar(
 	val activeRequester = remember { FocusRequester() }
 	val listState = rememberLazyListState()
 	val initialFocusRequest = remember { focusRequest }
-	val activeIndex = sidebarActiveIndex(libraries.map { it.id }, selectedLibraryId)
+	val activeIndex = sidebarActiveIndex(libraries.map { it.id }, selectedLibraryId, searchSelected)
 	LaunchedEffect(focusRequest) {
 		if (focusRequest != initialFocusRequest) {
-			listState.scrollToItem(activeIndex)
 			withFrameNanos { }
+			val layout = listState.layoutInfo
+			val activeItem = layout.visibleItemsInfo.firstOrNull { it.index == activeIndex }
+			if (activeItem == null || activeItem.offset < layout.viewportStartOffset ||
+				activeItem.offset + activeItem.size > layout.viewportEndOffset
+			) {
+				listState.scrollToItem(activeIndex)
+				withFrameNanos { }
+			}
 			activeRequester.requestFocus()
 		}
 	}
-	LazyColumn(
-		state = listState,
-		modifier = modifier
-			.width(if (expanded) 216.dp else 80.dp)
-			.fillMaxHeight()
-			.background(Color(0xFF081E2C))
-			.onPreviewKeyEvent { event ->
-				event.type == KeyEventType.KeyDown && event.key == contentKey && onContentFocus()
-			}
-			.onFocusChanged { onFocusChanged(it.hasFocus) }
-			.focusGroup()
-			.focusProperties {
-				onExit = {
-					when (requestedFocusDirection) {
-						FocusDirection.Up -> if (!onToolbarFocus()) cancelFocusChange()
-						FocusDirection.Down, FocusDirection.Left, FocusDirection.Right -> cancelFocusChange()
-						else -> Unit
-					}
+	// Keep visible entries stationary instead of applying Android TV's focus pivot.
+	CompositionLocalProvider(LocalBringIntoViewSpec provides SidebarBringIntoViewSpec) {
+		LazyColumn(
+			state = listState,
+			modifier = modifier
+				.width(if (expanded) 216.dp else 80.dp)
+				.fillMaxHeight()
+				.background(Color(0xFF081E2C))
+				.onPreviewKeyEvent { event ->
+					event.type == KeyEventType.KeyDown && event.key == contentKey && onContentFocus()
 				}
-			},
-		contentPadding = PaddingValues(horizontal = 8.dp, vertical = 16.dp),
-		verticalArrangement = Arrangement.spacedBy(8.dp),
-	) {
-		item(key = "home") {
-			HomeSidebarButton(
-				label = stringResource(R.string.lbl_home),
-				icon = R.drawable.ic_house,
-				onClick = onHomeClick,
-				selected = selectedLibraryId == null,
-				expanded = expanded,
-				modifier = if (activeIndex == 0) Modifier.focusRequester(activeRequester) else Modifier,
-			)
-		}
-		item(key = "libraries-heading") {
-			if (expanded) Text(
-				text = stringResource(R.string.lbl_my_media),
-				color = Color.White,
-				modifier = Modifier.height(44.dp).padding(start = 12.dp, top = 16.dp, bottom = 4.dp),
-			) else Spacer(Modifier.height(44.dp))
-		}
-		items(libraries, key = { it.id }) { library ->
-			HomeSidebarButton(
-				label = library.name.orEmpty(),
-				icon = when (library.collectionType) {
-					CollectionType.MOVIES -> R.drawable.ic_movie
-					CollectionType.TVSHOWS, CollectionType.LIVETV, CollectionType.MUSICVIDEOS -> R.drawable.ic_tv
-					CollectionType.MUSIC -> R.drawable.ic_select_audio
-					CollectionType.PLAYLISTS -> R.drawable.ic_playlists
-					else -> R.drawable.ic_folder
+				.onFocusChanged { onFocusChanged(it.hasFocus) }
+				.focusGroup()
+				.focusProperties {
+					onExit = {
+						when (requestedFocusDirection) {
+							FocusDirection.Up -> if (!onToolbarFocus()) cancelFocusChange()
+							FocusDirection.Down, FocusDirection.Left, FocusDirection.Right -> cancelFocusChange()
+							else -> Unit
+						}
+					}
 				},
-				onClick = { onLibraryClick(library) },
-				selected = library.id == selectedLibraryId,
-				expanded = expanded,
-				modifier = if (library.id == selectedLibraryId) Modifier.focusRequester(activeRequester) else Modifier,
-			)
-		}
-		if (loadFailed) {
-			item(key = "libraries-error") {
-				if (expanded) Text(stringResource(R.string.home_sidebar_load_error), modifier = Modifier.padding(12.dp))
+			contentPadding = PaddingValues(horizontal = 8.dp, vertical = 16.dp),
+			verticalArrangement = Arrangement.spacedBy(8.dp),
+		) {
+			item(key = "home") {
+				HomeSidebarButton(
+					label = stringResource(R.string.lbl_home),
+					icon = R.drawable.ic_house,
+					onClick = onHomeClick,
+					selected = selectedLibraryId == null && !searchSelected,
+					expanded = expanded,
+					modifier = if (activeIndex == 0) Modifier.focusRequester(activeRequester) else Modifier,
+				)
 			}
-			item(key = "libraries-retry") {
-				HomeSidebarButton(stringResource(R.string.home_sidebar_retry), R.drawable.ic_folder, onRetry, expanded = expanded)
+			item(key = "search") {
+				HomeSidebarButton(
+					label = stringResource(R.string.lbl_search),
+					icon = R.drawable.ic_search,
+					onClick = onSearchClick,
+					selected = searchSelected,
+					expanded = expanded,
+					modifier = if (activeIndex == 1) Modifier.focusRequester(activeRequester) else Modifier,
+				)
+			}
+			item(key = "libraries-heading") {
+				if (expanded) Text(
+					text = stringResource(R.string.lbl_my_media),
+					color = Color.White,
+					modifier = Modifier.height(44.dp).padding(start = 12.dp, top = 16.dp, bottom = 4.dp),
+				) else Spacer(Modifier.height(44.dp))
+			}
+			items(libraries, key = { it.id }) { library ->
+				HomeSidebarButton(
+					label = library.name.orEmpty(),
+					icon = when (library.collectionType) {
+						CollectionType.MOVIES -> R.drawable.ic_movie
+						CollectionType.TVSHOWS, CollectionType.LIVETV, CollectionType.MUSICVIDEOS -> R.drawable.ic_tv
+						CollectionType.MUSIC -> R.drawable.ic_select_audio
+						CollectionType.PLAYLISTS -> R.drawable.ic_playlists
+						else -> R.drawable.ic_folder
+					},
+					onClick = { onLibraryClick(library) },
+					selected = library.id == selectedLibraryId && !searchSelected,
+					expanded = expanded,
+					modifier = if (library.id == selectedLibraryId && !searchSelected) Modifier.focusRequester(activeRequester) else Modifier,
+				)
+			}
+			if (loadFailed) {
+				item(key = "libraries-error") {
+					if (expanded) Text(stringResource(R.string.home_sidebar_load_error), modifier = Modifier.padding(12.dp))
+				}
+				item(key = "libraries-retry") {
+					HomeSidebarButton(stringResource(R.string.home_sidebar_retry), R.drawable.ic_folder, onRetry, expanded = expanded)
+				}
 			}
 		}
 	}
@@ -172,6 +198,6 @@ private fun HomeSidebarButton(
 	}
 }
 
-// The heading occupies index 1 even while collapsed, so lazy-list focus targets stay stable.
-internal fun sidebarActiveIndex(libraries: List<UUID>, selectedLibraryId: UUID?): Int =
-	libraries.indexOf(selectedLibraryId).takeIf { it >= 0 }?.plus(2) ?: 0
+// Home and Search occupy 0/1; the heading retains index 2 even while collapsed.
+internal fun sidebarActiveIndex(libraries: List<UUID>, selectedLibraryId: UUID?, searchSelected: Boolean = false): Int =
+	if (searchSelected) 1 else libraries.indexOf(selectedLibraryId).takeIf { it >= 0 }?.plus(3) ?: 0

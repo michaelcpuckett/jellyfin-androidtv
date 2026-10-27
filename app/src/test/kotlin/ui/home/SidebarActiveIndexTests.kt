@@ -10,8 +10,13 @@ class SidebarActiveIndexTests : FunSpec({
 		sidebarActiveIndex(libraries, null) shouldBe 0
 	}
 	test("returning from a library targets that entry including entries outside the viewport") {
-		sidebarActiveIndex(libraries, libraries[1]) shouldBe 3
-		sidebarActiveIndex(libraries, libraries[29]) shouldBe 31
+		sidebarActiveIndex(libraries, libraries[1]) shouldBe 4
+		sidebarActiveIndex(libraries, libraries[29]) shouldBe 32
+	}
+	test("Search receives focus instead of Home or the previously selected library") {
+		sidebarActiveIndex(libraries, null, searchSelected = true) shouldBe 1
+		sidebarActiveIndex(libraries, libraries[29], searchSelected = true) shouldBe 1
+		sidebarActiveIndex(emptyList(), null, searchSelected = true) shouldBe 1
 	}
 	test("a removed library safely falls back to Home") {
 		sidebarActiveIndex(libraries, UUID.randomUUID()) shouldBe 0

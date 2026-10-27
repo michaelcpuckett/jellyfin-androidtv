@@ -43,6 +43,7 @@ import org.jellyfin.androidtv.ui.navigation.Destination
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationAction
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.search.SearchFragment
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.CollectionType
 import org.koin.compose.koinInject
@@ -146,6 +147,11 @@ fun AppNavigationHost(
 					if (destination?.fragment == HomeFragment::class) requestContentFocus()
 					else navigationRepository.reset(Destinations.home, clearHistory = true)
 				},
+				onSearchClick = {
+					if (destination?.fragment == SearchFragment::class) requestContentFocus()
+					else navigationRepository.navigate(Destinations.search())
+				},
+				searchSelected = destination?.fragment == SearchFragment::class,
 				selectedLibraryId = selectedLibrary?.let(UUID::fromString),
 				expanded = sidebarExpanded,
 				focusRequest = sidebarFocusRequest,

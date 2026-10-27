@@ -13,10 +13,11 @@ import org.jellyfin.androidtv.ui.itemdetail.FullDetailsFragment
 import org.jellyfin.androidtv.ui.playback.CustomPlaybackOverlayFragment
 import org.jellyfin.androidtv.ui.player.photo.PhotoPlayerFragment
 import org.jellyfin.androidtv.ui.player.video.VideoPlayerFragment
+import org.jellyfin.androidtv.ui.search.SearchFragment
 
 class BrowsingSidebarDestinationTests : FunSpec({
-	test("Home and every library presentation retain the navigation rail") {
-		for (fragment in listOf(HomeFragment::class, BrowseGridFragment::class, BrowseViewFragment::class, ByGenreFragment::class, ByLetterFragment::class, CollectionFragment::class, GenericFolderFragment::class, SuggestedMoviesFragment::class)) {
+	test("Home Search and every library presentation retain the navigation rail") {
+		for (fragment in listOf(HomeFragment::class, SearchFragment::class, BrowseGridFragment::class, BrowseViewFragment::class, ByGenreFragment::class, ByLetterFragment::class, CollectionFragment::class, GenericFolderFragment::class, SuggestedMoviesFragment::class)) {
 			showsBrowsingSidebar(fragment) shouldBe true
 		}
 	}

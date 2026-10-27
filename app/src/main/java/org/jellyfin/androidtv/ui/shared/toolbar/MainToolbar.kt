@@ -2,56 +2,49 @@ package org.jellyfin.androidtv.ui.shared.toolbar
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.SessionRepository
+import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.ui.NowPlayingComposable
 import org.jellyfin.androidtv.ui.base.Icon
-import org.jellyfin.androidtv.ui.base.JellyfinTheme
-import org.jellyfin.androidtv.ui.base.ProvideTextStyle
-import org.jellyfin.androidtv.ui.base.Text
-import org.jellyfin.androidtv.ui.base.button.Button
-import org.jellyfin.androidtv.ui.base.button.ButtonDefaults
+import org.jellyfin.androidtv.ui.base.ProfilePicture
 import org.jellyfin.androidtv.ui.base.button.IconButton
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
-import org.jellyfin.androidtv.ui.navigation.Destinations
-import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
+import org.jellyfin.androidtv.util.apiclient.getUrl
+import org.jellyfin.androidtv.util.apiclient.primaryImage
+import org.jellyfin.sdk.api.client.ApiClient
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinActivityViewModel
 
-enum class MainToolbarActiveButton {
-	User,
-	Home,
-	Search,
-
-	None,
-}
-
 @Composable
-fun MainToolbar(
-	activeButton: MainToolbarActiveButton = MainToolbarActiveButton.None,
-) {
+fun MainToolbar() {
 	val focusRequester = remember { FocusRequester() }
-	val navigationRepository = koinInject<NavigationRepository>()
 	val mediaManager = koinInject<MediaManager>()
 	val sessionRepository = koinInject<SessionRepository>()
+	val userRepository = koinInject<UserRepository>()
+	val api = koinInject<ApiClient>()
+	val currentUser by userRepository.currentUser.collectAsState()
+	val avatarUrl = remember(currentUser, api) { currentUser?.primaryImage?.getUrl(api) }
 	val settingsViewModel = koinActivityViewModel<SettingsViewModel>()
 	val activity = LocalActivity.current
-	val activeButtonColors = ButtonDefaults.colors(
-		containerColor = JellyfinTheme.colorScheme.buttonActive,
-		contentColor = JellyfinTheme.colorScheme.onButtonActive,
-	)
 
 	Toolbar(
 		modifier = Modifier
@@ -64,50 +57,24 @@ fun MainToolbar(
 				)
 			}
 		},
-		center = {
-			ToolbarButtons(
-				modifier = Modifier
-					.focusRequester(focusRequester)
-			) {
-				ProvideTextStyle(JellyfinTheme.typography.default.copy(fontWeight = FontWeight.Bold)) {
-					Button(
-						onClick = {
-							if (activeButton != MainToolbarActiveButton.Home) {
-								navigationRepository.navigate(
-									Destinations.home,
-									replace = true,
-								)
-							}
-						},
-						colors = if (activeButton == MainToolbarActiveButton.Home) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_home)) }
-					)
-					Button(
-						onClick = {
-							if (activeButton != MainToolbarActiveButton.Search) {
-								navigationRepository.navigate(Destinations.search())
-							}
-						},
-						colors = if (activeButton == MainToolbarActiveButton.Search) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.lbl_search)) }
-					)
-					Button(
-						onClick = {
-							if (activeButton != MainToolbarActiveButton.User) {
-								mediaManager.clearAudioQueue()
-								sessionRepository.destroyCurrentSession()
-								activity?.startActivity(ActivityDestinations.startup(activity))
-								activity?.finishAfterTransition()
-							}
-						},
-						colors = if (activeButton == MainToolbarActiveButton.User) activeButtonColors else ButtonDefaults.colors(),
-						content = { Text(stringResource(R.string.nav_profile)) }
-					)
-				}
-			}
-		},
 		end = {
 			ToolbarButtons {
+				IconButton(
+					onClick = {
+						mediaManager.clearAudioQueue()
+						sessionRepository.destroyCurrentSession()
+						activity?.startActivity(ActivityDestinations.startup(activity))
+						activity?.finishAfterTransition()
+					},
+					modifier = Modifier.focusRequester(focusRequester),
+					contentPadding = PaddingValues(6.dp),
+				) {
+					ProfilePicture(
+						url = avatarUrl,
+						contentDescription = stringResource(R.string.nav_profile),
+						modifier = Modifier.size(28.dp).clip(CircleShape),
+					)
+				}
 				IconButton(
 					onClick = { settingsViewModel.show() },
 				) {

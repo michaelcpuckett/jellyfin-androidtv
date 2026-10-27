@@ -50,14 +50,12 @@ object CategoryPlaybackControls {
 			id = View.generateViewId()
 			tag = TAG
 			orientation = LinearLayout.HORIZONTAL
-			gravity = Gravity.CENTER_VERTICAL
+			gravity = Gravity.START or Gravity.CENTER_VERTICAL
 		}
-		val margin = Utils.convertDpToPixel(context, 48)
 		// Keep the settings overlay (and other existing foreground views) above these controls.
 		root.addView(actions, 0, RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Utils.convertDpToPixel(context, 40)).apply {
 			addRule(RelativeLayout.BELOW, anchor.id)
-			marginStart = margin
-			marginEnd = margin
+			addRule(RelativeLayout.ALIGN_START, R.id.title)
 			topMargin = Utils.convertDpToPixel(context, 8)
 		})
 		(content.layoutParams as RelativeLayout.LayoutParams).apply {
